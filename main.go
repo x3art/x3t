@@ -56,13 +56,6 @@ func pi(rec []string, data interface{}) []string {
 	return ret
 }
 
-var pKinds = map[reflect.Kind]func([]string, reflect.Value) ([]string, error){
-	reflect.Int:     pint,
-	reflect.Float64: pfloat,
-	reflect.String:  pstring,
-	reflect.Array:   parray,
-}
-
 func pint(rec []string, v reflect.Value) ([]string, error) {
 	n, err := strconv.Atoi(rec[0])
 	if err != nil {
@@ -87,15 +80,31 @@ func pstring(rec []string, v reflect.Value) ([]string, error) {
 }
 
 func parray(rec []string, v reflect.Value) ([]string, error) {
+	for i := 0; i < v.Len(); i++ {
+		var err error
+		rec, err = pvalue(rec, v.Index(i))
+		if err != nil {
+			return rec, fmt.Errorf("Array field (%d): %v", i, err)
+		}
+	}
 	return rec, nil
 }
 
 func pvalue(rec []string, v reflect.Value) ([]string, error) {
-	fn, ok := pKinds[v.Kind()]
-	if !ok {
+	switch v.Kind() {
+	case reflect.Int:
+		return pint(rec, v)
+	case reflect.Float64:
+		return pfloat(rec, v)
+	case reflect.String:
+		return pstring(rec, v)
+	case reflect.Array:
+		return parray(rec, v)
+	case reflect.Struct:
+		return pstruct(rec, v)
+	default:
 		return rec, fmt.Errorf("bad kind: %v", v.Kind())
 	}
-	return fn(rec, v)
 }
 
 func pstruct(rec []string, v reflect.Value) ([]string, error) {
@@ -145,7 +154,7 @@ type Hdr struct {
 	TurretDescriptor     [6]struct{ CIndex, CPos int }
 }
 
-var tm = []string{
+/*
 	"Turret descriptor - fixed length array - the reason why there is only 6 + 1 turrets",
 	"TD 1",
 	"Cockpit index - index to TCockpits.txt",
@@ -204,4 +213,4 @@ var tm = []string{
 	"Video ID - ignored",
 	"Unknown value",
 	"Ship ID - identifier of the ship",
-}
+*/
