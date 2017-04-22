@@ -5,6 +5,7 @@ import (
 	"log"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 type tParser struct {
@@ -47,22 +48,37 @@ func (t *tParser) pfloat(v reflect.Value) error {
 	return nil
 }
 
+func tagParse(tag string) map[string]string {
+	ret := make(map[string]string)
+	for _, t := range strings.Split(tag, ",") {
+		ts := strings.SplitN(t, ":", 2)
+		if len(ts) == 1 {
+			ret[ts[0]] = "true"
+		} else {
+			ret[ts[0]] = ts[1]
+		}
+	}
+	return ret
+}
+
 func (t *tParser) pstring(v reflect.Value) error {
 	if t.lastTag != "" {
-		pid, err := strconv.Atoi(t.lastTag)
-		if err != nil || t.t[pid] == nil {
-			return fmt.Errorf("Bad page tag: %v", t.lastTag)
-		}
-		tid, err := strconv.Atoi(t.rec[0])
-		if err != nil || t.t[pid][tid] == "" {
+		tags := tagParse(t.lastTag)
+		if tags["page"] != "" {
+			pid, err := strconv.Atoi(tags["page"])
+			if err != nil || t.t[pid] == nil {
+				return fmt.Errorf("Bad page tag: %v", t.lastTag)
+			}
+			tid, err := strconv.Atoi(t.rec[0])
+			if err == nil && t.t[pid][tid] != "" {
+				v.SetString(t.t[pid][tid])
+				t.rec = t.rec[1:]
+				return nil
+			}
 			log.Printf("bad string ID: %d/%v", pid, t.rec[0])
-			v.SetString(fmt.Sprintf("bad string ID: %d/%v", pid, t.rec[0]))
-		} else {
-			v.SetString(t.t[pid][tid])
 		}
-	} else {
-		v.SetString(t.rec[0])
 	}
+	v.SetString(t.rec[0])
 	t.rec = t.rec[1:]
 	return nil
 }

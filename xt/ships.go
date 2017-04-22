@@ -39,7 +39,13 @@ func GetShips(n string, text Text) map[string]*Ship {
 		sh := &Ship{}
 		t := tParser{rec: rec, t: text}
 		t.parseAll(sh)
-		ships[sh.Description] = sh
+		desc := sh.Description
+		/*
+			if sh.Variation != "" {
+				desc += " " + sh.Variation
+			}
+		*/
+		ships[desc] = sh
 	}
 	return ships
 }
@@ -54,7 +60,7 @@ type Ship struct {
 	Roll      float64
 	// Class - ship class. Names of classes can be changed but classes itself are hardcoded into OBJ files
 	Class        string
-	Description  string `x3t:"17"`
+	Description  string `x3t:"page:17"`
 	Speed        int
 	Acceleration int
 	// Engine sound - Index to Sounds.txt
@@ -116,7 +122,7 @@ type Ship struct {
 	// Engine Trail - Particle Emitter - index to Effects.txt
 	EngineTrailParticleEmitter string
 	// Variation index - Hauler, Vanguard,... - index to Page 17 in text resource files. The String ID is calculated as 10000 + Variation index
-	VariationIndex string
+	Variation string `x3t:"page:17"`
 	// Max Rotation Acceleration - How fast the ship can go from 0 to maximum rotation speed
 	MaxRotationAcceleration int
 	// Class Description - String ID from Page 17 of text resource files

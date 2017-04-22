@@ -48,7 +48,7 @@ type Laser struct {
 	RotY                   float64
 	RotZ                   float64
 	Index                  string
-	Description            string `x3t:"17"`
+	Description            string `x3t:"page:17"`
 	RoF                    int
 	Sound                  int
 	Projectile             int
