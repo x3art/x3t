@@ -27,29 +27,38 @@ func main() {
 	r.Comment = '/'
 	r.Comma = ';'
 
-	// eat the first line.
-	_, err = r.Read()
+	rec, err := r.Read()
 	if err != nil {
 		log.Fatal(err)
 	}
+	inf := struct {
+		Ver  int
+		Nrec int
+	}{}
+	t := tParser{rec: rec, t: text}
+	t.parseAll(&inf)
 
-	for i := 0; i < 1; i++ {
+	ships := map[string]*Ship{}
+
+	for i := 0; i < inf.Nrec; i++ {
 		r.FieldsPerRecord = 0
 		rec, err := r.Read()
 		if err != nil {
 			log.Fatal(err)
 		}
 		sh := &Ship{}
-		t := tParser{rec: rec}
+		t := tParser{rec: rec, t: text}
 		t.parseAll(sh)
-		s, _ := json.MarshalIndent(&sh, "", "\t")
-		fmt.Printf("%s", s)
+		ships[sh.Description] = sh
 	}
+	s, _ := json.MarshalIndent(ships["Mammoth"], "", "\t")
+	fmt.Printf("%s", s)
 }
 
 type tParser struct {
 	rec     []string
 	lastTag string
+	t       Text
 }
 
 func (t *tParser) parseAll(data interface{}) {
@@ -87,7 +96,21 @@ func (t *tParser) pfloat(v reflect.Value) error {
 }
 
 func (t *tParser) pstring(v reflect.Value) error {
-	v.SetString(t.rec[0])
+	if t.lastTag != "" {
+		pid, err := strconv.Atoi(t.lastTag)
+		if err != nil || t.t[pid] == nil {
+			return fmt.Errorf("Bad page tag: %v", t.lastTag)
+		}
+		tid, err := strconv.Atoi(t.rec[0])
+		if err != nil || t.t[pid][tid] == "" {
+			log.Printf("bad string ID: %d/%v", pid, t.rec[0])
+			v.SetString(fmt.Sprintf("bad string ID: %d/%v", pid, t.rec[0]))
+		} else {
+			v.SetString(t.t[pid][tid])
+		}
+	} else {
+		v.SetString(t.rec[0])
+	}
 	t.rec = t.rec[1:]
 	return nil
 }
@@ -161,9 +184,8 @@ type Ship struct {
 	Pitch     float64
 	Roll      float64
 	// Class - ship class. Names of classes can be changed but classes itself are hardcoded into OBJ files
-	Class string
-	// Description - String ID from Page 17 of text resource files
-	Description  string
+	Class        string
+	Description  string `x3t:"17"`
 	Speed        int
 	Acceleration int
 	// Engine sound - Index to Sounds.txt
