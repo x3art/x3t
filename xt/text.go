@@ -1,4 +1,4 @@
-package main
+package xt
 
 import (
 	"encoding/xml"
@@ -25,7 +25,7 @@ type TextFile struct {
 
 type Text map[int]map[int]string
 
-func textDec(n string) Text {
+func GetText(n string) Text {
 	f, err := os.Open(n)
 	if err != nil {
 		log.Fatal(err)
