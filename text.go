@@ -43,33 +43,26 @@ func textDec(n string) Text {
 	d.Decode(&t)
 
 	ret := make(Text)
-	for pi := range t.Pages {
-		px := &t.Pages[pi]
-		if px.Id >= 300000 {
-			continue
+	merge := func(min, max int) {
+		for pi := range t.Pages {
+			px := &t.Pages[pi]
+			pid := px.Id
+			if pid >= max || pid < min {
+				continue
+			}
+			pid -= min
+			if _, ok := ret[pid]; !ok {
+				ret[pid] = make(map[int]string, len(px.T))
+			}
+			for ti := range px.T {
+				tx := &px.T[ti]
+				ret[pid][tx.Id] = tx.Value
+			}
 		}
-		pid := px.Id
-		if _, ok := ret[pid]; !ok {
-			ret[pid] = make(map[int]string, len(px.T))
-		}
-		for ti := range px.T {
-			tx := &px.T[ti]
-			ret[pid][tx.Id] = tx.Value
-		}
+
 	}
-	for pi := range t.Pages {
-		px := &t.Pages[pi]
-		if px.Id < 300000 {
-			continue
-		}
-		pid := px.Id - 300000
-		if _, ok := ret[pid]; !ok {
-			ret[pid] = make(map[int]string, len(px.T))
-		}
-		for ti := range px.T {
-			tx := &px.T[ti]
-			ret[pid][tx.Id] = tx.Value
-		}
-	}
+	merge(0, 300000)
+	merge(300000, 350000)
+	merge(350000, 400000)
 	return ret
 }
