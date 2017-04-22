@@ -7,10 +7,10 @@ import (
 	"x3t/xt"
 )
 
-var textFile = flag.String("-strings", "0001-L044.xml", "strings file")
-var shipsFile = flag.String("-ships", "TShips.txt", "ships file")
-var cockpitsFile = flag.String("-cockpits", "TCockpits.txt", "cockpits file")
-var lasersFile = flag.String("-lasers", "TLaser.txt", "lasers file")
+var textFile = flag.String("-strings", "data/0001-L044.xml", "strings file")
+var shipsFile = flag.String("-ships", "data/TShips.txt", "ships file")
+var cockpitsFile = flag.String("-cockpits", "data/TCockpits.txt", "cockpits file")
+var lasersFile = flag.String("-lasers", "data/TLaser.txt", "lasers file")
 
 func main() {
 	flag.Parse()
