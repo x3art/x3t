@@ -17,19 +17,16 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// It's not really a csv file, but this works, so why not.
 	r := csv.NewReader(f)
 	r.Comment = '/'
 	r.Comma = ';'
-	hdr, err := r.Read()
-	if err != nil {
-		log.Fatal(err)
-	}
-	x, err := strconv.Atoi(hdr[0])
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	_ = x
+	// eat the first line.
+	_, err = r.Read()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for i := 0; i < 30; i++ {
 		r.FieldsPerRecord = 0
@@ -39,25 +36,29 @@ func main() {
 		}
 		parse(rec)
 	}
-	fmt.Println(r.FieldsPerRecord)
 }
 
 func parse(rec []string) {
 	var h Hdr
 	rec = pi(rec, &h)
-	fmt.Println(h)
-	fmt.Println(rec)
+	//	fmt.Println(h)
+	if len(rec) == 1 && rec[0] == "" {
+		rec = rec[1:]
+	}
+	if len(rec) != 0 {
+		fmt.Printf("record not fully consumed: %v %v", rec, len(rec))
+	}
 }
 
 func pi(rec []string, data interface{}) []string {
-	ret, err := pstruct(rec, reflect.Indirect(reflect.ValueOf(data)))
+	ret, err := pstruct(rec, reflect.Indirect(reflect.ValueOf(data)), reflect.Value{})
 	if err != nil {
 		log.Fatal(err)
 	}
 	return ret
 }
 
-func pint(rec []string, v reflect.Value) ([]string, error) {
+func pint(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
 	n, err := strconv.Atoi(rec[0])
 	if err != nil {
 		return rec, err
@@ -66,7 +67,7 @@ func pint(rec []string, v reflect.Value) ([]string, error) {
 	return rec[1:], nil
 }
 
-func pfloat(rec []string, v reflect.Value) ([]string, error) {
+func pfloat(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
 	n, err := strconv.ParseFloat(rec[0], 64)
 	if err != nil {
 		return rec, err
@@ -75,15 +76,15 @@ func pfloat(rec []string, v reflect.Value) ([]string, error) {
 	return rec[1:], nil
 }
 
-func pstring(rec []string, v reflect.Value) ([]string, error) {
+func pstring(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
 	v.SetString(rec[0])
 	return rec[1:], nil
 }
 
-func parray(rec []string, v reflect.Value) ([]string, error) {
+func parray(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
 	for i := 0; i < v.Len(); i++ {
 		var err error
-		rec, err = pvalue(rec, v.Index(i))
+		rec, err = pvalue(rec, v.Index(i), reflect.Value{})
 		if err != nil {
 			return rec, fmt.Errorf("Array field (%d): %v", i, err)
 		}
@@ -91,33 +92,53 @@ func parray(rec []string, v reflect.Value) ([]string, error) {
 	return rec, nil
 }
 
-func pvalue(rec []string, v reflect.Value) ([]string, error) {
-	switch v.Kind() {
-	case reflect.Int:
-		return pint(rec, v)
-	case reflect.Float64:
-		return pfloat(rec, v)
-	case reflect.String:
-		return pstring(rec, v)
-	case reflect.Array:
-		return parray(rec, v)
-	case reflect.Struct:
-		return pstruct(rec, v)
-	default:
-		return rec, fmt.Errorf("bad kind: %v", v.Kind())
-	}
-}
-
-func pstruct(rec []string, v reflect.Value) ([]string, error) {
+func pstruct(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
 	for i := 0; i < v.NumField(); i++ {
 		fv := v.Field(i)
+		sf := v.Type().Field(i)
+		var tv reflect.Value
+		if tag := sf.Tag.Get("x3t"); tag != "" {
+			tv = v.FieldByName(tag)
+		}
 		var err error
-		rec, err = pvalue(rec, fv)
+		rec, err = pvalue(rec, fv, tv)
 		if err != nil {
 			return rec, fmt.Errorf("Parse Field (%s): %v", v.Type().Field(i).Name, err)
 		}
 	}
 	return rec, nil
+}
+
+func pslice(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
+	l := int(tag.Int())
+	v.Set(reflect.MakeSlice(v.Type(), l, l))
+	for i := 0; i < l; i++ {
+		var err error
+		rec, err = pvalue(rec, v.Index(i), reflect.Value{})
+		if err != nil {
+			return rec, fmt.Errorf("slice field (%d): %v", i, err)
+		}
+	}
+	return rec, nil
+}
+
+func pvalue(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
+	switch v.Kind() {
+	case reflect.Int:
+		return pint(rec, v, tag)
+	case reflect.Float64:
+		return pfloat(rec, v, tag)
+	case reflect.String:
+		return pstring(rec, v, tag)
+	case reflect.Array:
+		return parray(rec, v, tag)
+	case reflect.Struct:
+		return pstruct(rec, v, tag)
+	case reflect.Slice:
+		return pslice(rec, v, tag)
+	default:
+		return rec, fmt.Errorf("bad kind: %v", v.Kind())
+	}
 }
 
 type Hdr struct {
@@ -198,36 +219,54 @@ type Hdr struct {
 	MaxRotationAcceleration int
 	// Class Description - String ID from Page 17 of text resource files
 	ClassDescription string
-}
-
-/*
-	// Cockpit count - number of cockpit records
-	 // Cockpit - repeatable
-	  // Index - an index of the cockpit - starting from 1
-	  // Turret index - an index starting from 0. It's not clear what it's purpose (if any)
-	  // Body ID - Body ID from ship's scene for this cockpit
-	  // Path index - Path index of the above Body ID
-	// Gun groups count - number of gun group records
-	 // Gun group - repeatable
-	  // Initial laser index - calculated as 1 + count of laser parts in previous gun groups
-	  // No of guns - number of laser parts
-	  // Index - an index of the gun group - starting from 1
-	  // No of gun records - number of gun records
-	   // Gun - repeatable
-	    // Index - an index of the gun. The index continues between gun groups (i.e. it's unique and global)
-	    // Count of laser parts - number of laser parts in BOD/BOB file
-	    // Body ID (primary) - Body ID from ship scene
-	    // Path index (primary) - Path index from ship scene
-	    // Body ID (secondary) - Body ID from weapon scene
-	    // Path index (secondary) - Path index from weapon scene
-	// Volume - ignored
+	CockpitCount     int
+	Cockpit          []struct {
+		Index       string
+		TurretIndex string
+		BodyID      string
+		PathIndex   string
+	} `x3t:"CockpitCount"`
+	GunGroupsCount int
+	GunGroup       []struct {
+		// Initial laser index - calculated as 1 + count of laser parts in previous gun groups
+		InitialLaserIndex int
+		// No of guns - number of laser parts
+		NumGuns int
+		// Index - an index of the gun group - starting from 1
+		GunGroupIndex int
+		NumGunRecords int
+		Gun           []struct {
+			// Index - an index of the gun. The index continues between gun groups (i.e. it's unique and global)
+			Index int
+			// Count of laser parts - number of laser parts in BOD/BOB file
+			CountLaserParts int
+			// Body ID (primary) - Body ID from ship scene
+			BodyID string
+			// Path index (primary) - Path index from ship scene
+			PathIndex string
+			// Body ID (secondary) - Body ID from weapon scene
+			BodyID2 string
+			// Path index (secondary) - Path index from weapon scene
+			PathIndex2 string
+		} `x3t:"NumGunRecords"`
+	} `x3t:"GunGroupsCount"`
+	Volume string
 	// Production RelVal (NPC) - Price for NPCs (it's not really a price)
+	ProductionRelValNPC int
 	// Price modifier (1)
+	PriceModifier1 int
 	// Price modifier (2)
+	PriceModifier2 int
 	// Ware class - ignored
+	WareClass string
 	// Production RelVal (player) - Price for the player (it's not really a price)
+	ProductionRelValPlayer int
 	// Min. Notoriety - minimum notoriety the player must have with corresponding race to be able to buy the ship
+	MinNotoriety int
 	// Video ID - ignored
+	VideoID string
 	// Unknown value
+	UknownValue string
 	// Ship ID - identifier of the ship
-*/
+	ShipID string
+}
