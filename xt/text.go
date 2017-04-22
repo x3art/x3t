@@ -56,6 +56,7 @@ func GetText(n string) Text {
 	}
 	merge(0, 300000)
 	merge(300000, 350000)
-	merge(350000, 400000)
+	merge(350000, 380000)
+	merge(380000, 600000)
 	return ret
 }
