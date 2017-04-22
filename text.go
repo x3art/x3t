@@ -6,13 +6,6 @@ import (
 	"os"
 )
 
-/*
-<page id="7" title="Boardcomp. Sectornames" descr="Names of all sectors (spoken by Boardcomputer)" voice="yes">
- <t id="1020000">Unknown Sector</t>
- <t id="1020101">Kingdom End</t>
- <t id="1020117">{7,1020000}</t>
-*/
-
 type PageXML struct {
 	Id    int    `xml:"id,attr"`
 	Title string `xml:"title,attr"`
