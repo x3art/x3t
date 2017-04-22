@@ -122,7 +122,7 @@ type Ship struct {
 	// Engine Trail - Particle Emitter - index to Effects.txt
 	EngineTrailParticleEmitter string
 	// Variation index - Hauler, Vanguard,... - index to Page 17 in text resource files. The String ID is calculated as 10000 + Variation index
-	Variation string `x3t:"page:17"`
+	Variation string `x3t:"page:17,offset:10000,ignore:20"`
 	// Max Rotation Acceleration - How fast the ship can go from 0 to maximum rotation speed
 	MaxRotationAcceleration int
 	// Class Description - String ID from Page 17 of text resource files
