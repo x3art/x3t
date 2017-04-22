@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -10,12 +11,16 @@ import (
 	"strconv"
 )
 
+var text Text
+
 func main() {
 	flag.Parse()
 	f, err := os.Open(flag.Arg(0))
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	text = textDec(flag.Arg(1))
 
 	// It's not really a csv file, but this works, so why not.
 	r := csv.NewReader(f)
@@ -28,120 +33,126 @@ func main() {
 		log.Fatal(err)
 	}
 
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 1; i++ {
 		r.FieldsPerRecord = 0
 		rec, err := r.Read()
 		if err != nil {
 			log.Fatal(err)
 		}
-		parse(rec)
+		sh := &Ship{}
+		t := tParser{rec: rec}
+		t.parseAll(sh)
+		s, _ := json.MarshalIndent(&sh, "", "\t")
+		fmt.Printf("%s", s)
 	}
 }
 
-func parse(rec []string) {
-	var h Hdr
-	rec = pi(rec, &h)
-	//	fmt.Println(h)
-	if len(rec) == 1 && rec[0] == "" {
-		rec = rec[1:]
-	}
-	if len(rec) != 0 {
-		fmt.Printf("record not fully consumed: %v %v", rec, len(rec))
-	}
+type tParser struct {
+	rec     []string
+	lastTag string
 }
 
-func pi(rec []string, data interface{}) []string {
-	ret, err := pstruct(rec, reflect.Indirect(reflect.ValueOf(data)), reflect.Value{})
+func (t *tParser) parseAll(data interface{}) {
+	err := t.pvalue(reflect.Indirect(reflect.ValueOf(data)))
 	if err != nil {
 		log.Fatal(err)
 	}
-	return ret
+
+	if len(t.rec) == 1 && t.rec[0] == "" {
+		t.rec = t.rec[1:]
+	}
+	if len(t.rec) != 0 {
+		log.Fatalf("record not fully consumed: %v %v", t.rec, len(t.rec))
+	}
 }
 
-func pint(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
-	n, err := strconv.Atoi(rec[0])
+func (t *tParser) pint(v reflect.Value) error {
+	n, err := strconv.Atoi(t.rec[0])
 	if err != nil {
-		return rec, err
+		return err
 	}
 	v.SetInt(int64(n))
-	return rec[1:], nil
+	t.rec = t.rec[1:]
+	return nil
 }
 
-func pfloat(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
-	n, err := strconv.ParseFloat(rec[0], 64)
+func (t *tParser) pfloat(v reflect.Value) error {
+	n, err := strconv.ParseFloat(t.rec[0], 64)
 	if err != nil {
-		return rec, err
+		return err
 	}
 	v.SetFloat(n)
-	return rec[1:], nil
+	t.rec = t.rec[1:]
+	return nil
 }
 
-func pstring(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
-	v.SetString(rec[0])
-	return rec[1:], nil
+func (t *tParser) pstring(v reflect.Value) error {
+	v.SetString(t.rec[0])
+	t.rec = t.rec[1:]
+	return nil
 }
 
-func parray(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
+func (t *tParser) parray(v reflect.Value) error {
 	for i := 0; i < v.Len(); i++ {
 		var err error
-		rec, err = pvalue(rec, v.Index(i), reflect.Value{})
+		err = t.pvalue(v.Index(i))
 		if err != nil {
-			return rec, fmt.Errorf("Array field (%d): %v", i, err)
+			return fmt.Errorf("Array field (%d): %v", i, err)
 		}
 	}
-	return rec, nil
+	return nil
 }
 
-func pstruct(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
+func (t *tParser) pstruct(v reflect.Value) error {
 	for i := 0; i < v.NumField(); i++ {
 		fv := v.Field(i)
 		sf := v.Type().Field(i)
-		var tv reflect.Value
-		if tag := sf.Tag.Get("x3t"); tag != "" {
-			tv = v.FieldByName(tag)
-		}
-		var err error
-		rec, err = pvalue(rec, fv, tv)
+		t.lastTag = sf.Tag.Get("x3t")
+		err := t.pvalue(fv)
 		if err != nil {
-			return rec, fmt.Errorf("Parse Field (%s): %v", v.Type().Field(i).Name, err)
+			return fmt.Errorf("Parse Field (%s): %v", v.Type().Field(i).Name, err)
 		}
 	}
-	return rec, nil
+	return nil
 }
 
-func pslice(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
-	l := int(tag.Int())
+func (t *tParser) pslice(v reflect.Value) error {
+	// Slices are prefixed with a length
+	l, err := strconv.Atoi(t.rec[0])
+	if err != nil {
+		return fmt.Errorf("slice length: %v", err)
+	}
+	t.rec = t.rec[1:]
 	v.Set(reflect.MakeSlice(v.Type(), l, l))
 	for i := 0; i < l; i++ {
-		var err error
-		rec, err = pvalue(rec, v.Index(i), reflect.Value{})
+		err := t.pvalue(v.Index(i))
 		if err != nil {
-			return rec, fmt.Errorf("slice field (%d): %v", i, err)
+			return fmt.Errorf("slice field (%d): %v", i, err)
 		}
 	}
-	return rec, nil
+	return nil
 }
 
-func pvalue(rec []string, v reflect.Value, tag reflect.Value) ([]string, error) {
+func (t *tParser) pvalue(v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Int:
-		return pint(rec, v, tag)
+		return t.pint(v)
 	case reflect.Float64:
-		return pfloat(rec, v, tag)
+		return t.pfloat(v)
 	case reflect.String:
-		return pstring(rec, v, tag)
+		return t.pstring(v)
 	case reflect.Array:
-		return parray(rec, v, tag)
+		return t.parray(v)
 	case reflect.Struct:
-		return pstruct(rec, v, tag)
+		return t.pstruct(v)
 	case reflect.Slice:
-		return pslice(rec, v, tag)
+		return t.pslice(v)
 	default:
-		return rec, fmt.Errorf("bad kind: %v", v.Kind())
+		return fmt.Errorf("bad kind: %v", v.Kind())
 	}
 }
 
-type Hdr struct {
+type Ship struct {
 	// Body file - not used
 	BodyFile string
 	// Picture ID - not used
@@ -219,22 +230,19 @@ type Hdr struct {
 	MaxRotationAcceleration int
 	// Class Description - String ID from Page 17 of text resource files
 	ClassDescription string
-	CockpitCount     int
 	Cockpit          []struct {
 		Index       string
 		TurretIndex string
 		BodyID      string
 		PathIndex   string
-	} `x3t:"CockpitCount"`
-	GunGroupsCount int
-	GunGroup       []struct {
+	}
+	GunGroup []struct {
 		// Initial laser index - calculated as 1 + count of laser parts in previous gun groups
 		InitialLaserIndex int
 		// No of guns - number of laser parts
 		NumGuns int
 		// Index - an index of the gun group - starting from 1
 		GunGroupIndex int
-		NumGunRecords int
 		Gun           []struct {
 			// Index - an index of the gun. The index continues between gun groups (i.e. it's unique and global)
 			Index int
@@ -248,8 +256,8 @@ type Hdr struct {
 			BodyID2 string
 			// Path index (secondary) - Path index from weapon scene
 			PathIndex2 string
-		} `x3t:"NumGunRecords"`
-	} `x3t:"GunGroupsCount"`
+		}
+	}
 	Volume string
 	// Production RelVal (NPC) - Price for NPCs (it's not really a price)
 	ProductionRelValNPC int
