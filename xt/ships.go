@@ -122,7 +122,7 @@ type Ship struct {
 	// Class Description - String ID from Page 17 of text resource files
 	ClassDescription string
 	Cockpit          []struct {
-		Index       string
+		Index       int
 		TurretIndex string
 		BodyID      string
 		PathIndex   string

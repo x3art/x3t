@@ -7,12 +7,30 @@ import (
 	"x3t/xt"
 )
 
+var textFile = flag.String("-strings", "0001-L044.xml", "strings file")
+var shipsFile = flag.String("-ships", "TShips.txt", "ships file")
+var cockpitsFile = flag.String("-cockpits", "TCockpits.txt", "cockpits file")
+var lasersFile = flag.String("-lasers", "TLaser.txt", "lasers file")
+
 func main() {
 	flag.Parse()
 
-	text := xt.GetText(flag.Arg(1))
-	ships := xt.GetShips(flag.Arg(0), text)
+	text := xt.GetText(*textFile)
+	ships := xt.GetShips(*shipsFile, text)
+	cockpits := xt.GetCockpits(*cockpitsFile, text)
+	lasers := xt.GetLasers(*lasersFile, text)
 
-	s, _ := json.MarshalIndent(ships["Mammoth"], "", "\t")
+	ship := flag.Arg(0)
+
+	s, _ := json.MarshalIndent(ships[ship], "", "\t")
 	fmt.Printf("%s", s)
+	s, _ = json.MarshalIndent(cockpits[ships[ship].TurretDescriptor[0].CIndex], "", "\t")
+	fmt.Printf("%s", s)
+
+	l := cockpits[ships[ship].TurretDescriptor[0].CIndex].LaserMask
+	for i := uint(0); i < 64; i++ {
+		if l&(1<<i) != 0 {
+			fmt.Println(lasers[i].Description)
+		}
+	}
 }
