@@ -65,30 +65,35 @@ func (t *tParser) pstring(v reflect.Value) error {
 	if t.lastTag != "" {
 		tags := tagParse(t.lastTag)
 		if tags["page"] != "" {
+			if t.rec[0] == "0" || t.rec[0] == tags["ignore"] {
+				t.rec = t.rec[1:]
+				v.SetString("")
+				return nil
+			}
+
 			pid, err := strconv.Atoi(tags["page"])
-			if err != nil || t.t[pid] == nil {
+			if err != nil {
 				return fmt.Errorf("Bad page tag: %v", t.lastTag)
 			}
 			var off int
 			if tags["offset"] != "" {
 				off, err = strconv.Atoi(tags["offset"])
 				if err != nil {
-					return fmt.Errorf("Bad offset: %v", tags["offset"])
+					return fmt.Errorf("Bad offset tag: %v", tags["offset"])
 				}
 			}
 			tid, err := strconv.Atoi(t.rec[0])
+			if err != nil {
+				return fmt.Errorf("Bad string id: %v", t.rec[0])
+			}
 			tid += off
-			if err == nil && t.t[pid][tid] != "" {
-				v.SetString(t.t[pid][tid])
-				t.rec = t.rec[1:]
-				return nil
+			t.rec = t.rec[1:]
+			s, err := t.t.Get(pid, tid)
+			if err != nil {
+				return err
 			}
-			if t.rec[0] == "0" || t.rec[0] == tags["ignore"] {
-				v.SetString("")
-				t.rec = t.rec[1:]
-				return nil
-			}
-			log.Printf("bad string ID: %d/%v", pid, t.rec[0])
+			v.SetString(s)
+			return nil
 		}
 	}
 	v.SetString(t.rec[0])
