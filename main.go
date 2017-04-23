@@ -1,11 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 	"x3t/xt"
 )
 
@@ -81,28 +81,35 @@ var shipTmpl = template.Must(template.New("ships").Parse(`
 <title> foobar </title>
 </head>
 <body>
+  {{.Description}} {{.Variation}}<br/>
+  Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
 </body>
 </html>
 `))
 
 func (st *state) ship(w http.ResponseWriter, req *http.Request) {
-	//	s := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/ship/"), "/", 2)
-	var ship *xt.Ship
-	/*
-		switch len(s) {
-		case 1:
-			ship = &st.ships[s[0]]
-		case 2:
-			ship = &st.ships[s[0]]
-			// variation = s[1]	// XXX - we need to handle this.
-		}
-	*/
-	if ship == nil {
-		http.NotFound(w, req)
-		return
+	s := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/ship/"), "/", 2)
+	var name, variation string
+
+	switch len(s) {
+	case 1:
+		name = s[0]
+	case 2:
+		name = s[0]
+		variation = s[1]
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
-	enc := json.NewEncoder(w)
-	enc.Encode(ship)
+	for i := range st.ships {
+		if st.ships[i].Description == name && st.ships[i].Variation == variation {
+			/*
+				w.Header().Set("Content-Type", "text/plain")
+				enc := json.NewEncoder(w)
+				enc.Encode(st.ships[i])
+			*/
+			shipTmpl.Execute(w, st.ships[i])
+			return
+		}
+	}
+
+	http.NotFound(w, req)
 }
