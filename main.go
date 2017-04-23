@@ -53,38 +53,40 @@ func main() {
 	*/
 }
 
-var shipsTmpl = template.Must(template.New("ships").Parse(`
+var tmpl = template.Must(template.New("all").Parse(`
+{{- define "header" -}}
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <title> foobar </title>
 </head>
 <body>
+{{- end -}}
+{{- define "footer" -}}
+</body>
+</html>
+{{- end -}}
+`))
+
+var _ = template.Must(tmpl.New("shiplist").Parse(`
+{{template "header"}}
  <ul>
 {{- range .}}
   <li>{{.Description}} {{.Variation}}
 {{- end}}
  </ul>
-</body>
-</html>
+{{template "footer"}}
 `))
 
 func (st *state) shiplist(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/html")
-	shipsTmpl.Execute(w, st.ships)
+	tmpl.ExecuteTemplate(w, "shiplist", st.ships)
 }
 
-var shipTmpl = template.Must(template.New("ships").Parse(`
-<html>
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<title> foobar </title>
-</head>
-<body>
+var _ = template.Must(tmpl.New("ship").Parse(`
+{{template "header"}}
   {{.Description}} {{.Variation}}<br/>
   Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
-</body>
-</html>
+{{template "footer"}}
 `))
 
 func (st *state) ship(w http.ResponseWriter, req *http.Request) {
@@ -101,12 +103,7 @@ func (st *state) ship(w http.ResponseWriter, req *http.Request) {
 
 	for i := range st.ships {
 		if st.ships[i].Description == name && st.ships[i].Variation == variation {
-			/*
-				w.Header().Set("Content-Type", "text/plain")
-				enc := json.NewEncoder(w)
-				enc.Encode(st.ships[i])
-			*/
-			shipTmpl.Execute(w, st.ships[i])
+			tmpl.ExecuteTemplate(w, "ship", st.ships[i])
 			return
 		}
 	}
