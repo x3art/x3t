@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func GetShips(n string, text Text) map[string]*Ship {
+func GetShips(n string, text Text) []Ship {
 	f, err := os.Open(n)
 	if err != nil {
 		log.Fatal(err)
@@ -28,24 +28,15 @@ func GetShips(n string, text Text) map[string]*Ship {
 	t := tParser{rec: rec, t: text}
 	t.parseAll(&inf)
 
-	ships := map[string]*Ship{}
-
+	ships := make([]Ship, inf.Nrec)
 	for i := 0; i < inf.Nrec; i++ {
 		r.FieldsPerRecord = 0
 		rec, err := r.Read()
 		if err != nil {
 			log.Fatal(err)
 		}
-		sh := &Ship{}
 		t := tParser{rec: rec, t: text}
-		t.parseAll(sh)
-		desc := sh.Description
-		/*
-			if sh.Variation != "" {
-				desc += " " + sh.Variation
-			}
-		*/
-		ships[desc] = sh
+		t.parseAll(&ships[i])
 	}
 	return ships
 }

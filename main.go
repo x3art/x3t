@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"html/template"
 	"log"
 	"net/http"
-	"strings"
 	"x3t/xt"
 )
 
@@ -16,7 +16,7 @@ var lasersFile = flag.String("-lasers", "data/TLaser.txt", "lasers file")
 
 type state struct {
 	text     xt.Text
-	ships    map[string]*xt.Ship
+	ships    []xt.Ship
 	cockpits []xt.Cockpit
 	lasers   []xt.Laser
 }
@@ -33,6 +33,7 @@ func main() {
 	}
 
 	http.HandleFunc("/ship/", st.ship)
+	http.HandleFunc("/ships/", st.shiplist)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 
 	/*
@@ -52,17 +53,50 @@ func main() {
 	*/
 }
 
-func (st *state) ship(w http.ResponseWriter, req *http.Request) {
-	s := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/ship/"), "/", 2)
-	var ship *xt.Ship
-	switch len(s) {
-	case 1:
-		ship = st.ships[s[0]]
-	case 2:
-		ship = st.ships[s[0]]
-		// variation = s[1]	// XXX - we need to handle this right.
-	}
+var shipsTmpl = template.Must(template.New("ships").Parse(`
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title> foobar </title>
+</head>
+<body>
+ <ul>
+{{- range .}}
+  <li>{{.Description}} {{.Variation}}
+{{- end}}
+ </ul>
+</body>
+</html>
+`))
 
+func (st *state) shiplist(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	shipsTmpl.Execute(w, st.ships)
+}
+
+var shipTmpl = template.Must(template.New("ships").Parse(`
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title> foobar </title>
+</head>
+<body>
+</body>
+</html>
+`))
+
+func (st *state) ship(w http.ResponseWriter, req *http.Request) {
+	//	s := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/ship/"), "/", 2)
+	var ship *xt.Ship
+	/*
+		switch len(s) {
+		case 1:
+			ship = &st.ships[s[0]]
+		case 2:
+			ship = &st.ships[s[0]]
+			// variation = s[1]	// XXX - we need to handle this.
+		}
+	*/
 	if ship == nil {
 		http.NotFound(w, req)
 		return
