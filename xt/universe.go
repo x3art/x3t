@@ -62,6 +62,10 @@ func (s *Sector) decodeOs() {
 	}
 }
 
+func (s *Sector) Name(text Text) string {
+	return text[7][1020000+100*(s.Y+1)+(s.X+1)]
+}
+
 type O struct {
 	T     int        `xml:"t,attr"`
 	Attrs []xml.Attr `xml:",any,attr"`
