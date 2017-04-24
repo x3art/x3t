@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"strconv"
 )
 
@@ -36,7 +37,7 @@ func (s *Sector) decodeOs() {
 		case 2: // Background
 		case 3:
 			s.Suns = append(s.Suns, Sun{})
-			s.Suns[len(s.Suns)-1].Decode(o.Attrs)
+			o.Decode(&s.Suns[len(s.Suns)-1])
 		case 4: // Planets
 		case 5: // Trading Dock
 		case 6: // Factories Shipyards
@@ -44,7 +45,7 @@ func (s *Sector) decodeOs() {
 		case 8, 9, 10, 11, 12, 13, 14, 15, 16: // Wares
 		case 17: // Asteroids
 			s.Asteroids = append(s.Asteroids, Asteroid{})
-			s.Asteroids[len(s.Asteroids)-1].Decode(o.Attrs)
+			o.Decode(&s.Asteroids[len(s.Asteroids)-1])
 		case 18: // Gates
 		case 20: // Specials
 		default:
@@ -77,64 +78,64 @@ type Universe struct {
 }
 
 type Asteroid struct {
-	Type   int
-	Amount int
-}
-
-func (a *Asteroid) Decode(attrs []xml.Attr) {
-	for _, attr := range attrs {
-		i, err := strconv.Atoi(attr.Value)
-		if err != nil {
-			log.Fatal(err)
-		}
-		switch attr.Name.Local {
-		case "s":
-		case "x":
-		case "y":
-		case "z":
-		case "a":
-		case "b":
-		case "g":
-		case "atype":
-			a.Type = i
-		case "aamount":
-			a.Amount = i
-		default:
-			log.Print("Unknown attr k: ", attr.Name.Local, attr.Value)
-		}
-	}
+	Type   int `x3t:"o:atype"`
+	Amount int `x3t:"o:aamount"`
+	S      int `x3t:"o:s"`
+	X      int `x3t:"o:x"`
+	Y      int `x3t:"o:y"`
+	Z      int `x3t:"o:z"`
+	A      int `x3t:"o:a"`
+	B      int `x3t:"o:b"`
+	G      int `x3t:"o:g"`
+	F      int `x3t:"o:f"`
 }
 
 type Sun struct {
-	S     int
-	X     int
-	Y     int
-	Z     int
-	Color int
-	F     int
+	S     int `x3t:"o:s"`
+	X     int `x3t:"o:x"`
+	Y     int `x3t:"o:y"`
+	Z     int `x3t:"o:z"`
+	Color int `x3t:"o:color"`
+	F     int `x3t:"o:f"`
 }
 
-func (s *Sun) Decode(attrs []xml.Attr) {
-	for _, attr := range attrs {
-		i, err := strconv.Atoi(attr.Value)
-		if err != nil {
-			log.Fatal(err)
+type odec struct {
+	i int
+	k reflect.Kind
+}
+type odecoder map[string]odec
+
+var ocache = map[reflect.Type]odecoder{}
+
+func (o *O) Decode(data interface{}) {
+	v := reflect.Indirect(reflect.ValueOf(data))
+	t := v.Type()
+	dec := ocache[t]
+	if dec == nil {
+		dec = make(odecoder)
+		for i := 0; i < t.NumField(); i++ {
+			tag := t.Field(i).Tag.Get("x3t")
+			tp := tagParse(tag)
+			if field := tp["o"]; field != "" {
+				dec[field] = odec{i, t.Field(i).Type.Kind()}
+			}
 		}
-		switch attr.Name.Local {
-		case "s":
-			s.S = i
-		case "x":
-			s.X = i
-		case "y":
-			s.Y = i
-		case "z":
-			s.Z = i
-		case "color":
-			s.Color = i
-		case "f":
-			s.F = i
-		default:
-			log.Print("Unknown attr k: ", attr.Name.Local, attr.Value)
+		ocache[t] = dec
+	}
+	for _, attr := range o.Attrs {
+		if d, ok := dec[attr.Name.Local]; ok {
+			switch d.k {
+			case reflect.Int:
+				i, err := strconv.Atoi(attr.Value)
+				if err != nil {
+					log.Fatal(err)
+				}
+				v.Field(d.i).SetInt(int64(i))
+			default:
+				log.Fatal("unknown field type")
+			}
+		} else {
+			log.Printf("unknown attr %v: %v", attr.Name.Local, attr.Value)
 		}
 	}
 }
