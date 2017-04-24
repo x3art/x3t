@@ -11,6 +11,7 @@ var textFile = flag.String("-strings", "data/0001-L044.xml", "strings file")
 var shipsFile = flag.String("-ships", "data/TShips.txt", "ships file")
 var cockpitsFile = flag.String("-cockpits", "data/TCockpits.txt", "cockpits file")
 var lasersFile = flag.String("-lasers", "data/TLaser.txt", "lasers file")
+var universeFile = flag.String("-universe", "data/x3_universe.xml", "universe file")
 
 func main() {
 	flag.Parse()
@@ -19,6 +20,7 @@ func main() {
 	ships := xt.GetShips(*shipsFile, text)
 	cockpits := xt.GetCockpits(*cockpitsFile, text)
 	lasers := xt.GetLasers(*lasersFile, text)
+	u := xt.GetUniverse(*universeFile)
 
 	ship := flag.Arg(0)
 
@@ -31,6 +33,13 @@ func main() {
 	for i := uint(0); i < 64; i++ {
 		if l&(1<<i) != 0 {
 			fmt.Println(lasers[i].Description)
+		}
+	}
+
+	for i := range u.Sectors {
+		s := &u.Sectors[i]
+		if s.X == 8 && s.Y == 6 {
+			fmt.Printf("foo: %d\n", s.SunPercent)
 		}
 	}
 }
