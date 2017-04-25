@@ -178,9 +178,8 @@ type odec struct {
 }
 
 type odecoder struct {
-	fields   map[string]odec
-	ts       map[int][]int
-	overflow int
+	fields map[string]odec
+	ts     map[int][]int
 }
 
 type O struct {
@@ -219,9 +218,6 @@ func (dec *odecoder) embed(t reflect.Type, index []int) {
 		if ofield := tp["o"]; ofield != "" {
 			dec.fields[ofield] = odec{append(index, i), field.Type.Kind()}
 		}
-		if tp["os"] != "" {
-			dec.overflow = i
-		}
 		if ot := tp["ot"]; ot != "" {
 			typ, err := strconv.Atoi(ot)
 			if err != nil {
@@ -235,7 +231,7 @@ func (dec *odecoder) embed(t reflect.Type, index []int) {
 func decoder(t reflect.Type) *odecoder {
 	dec := ocache[t]
 	if dec == nil {
-		dec = &odecoder{fields: make(map[string]odec), ts: make(map[int][]int), overflow: -1}
+		dec = &odecoder{fields: make(map[string]odec), ts: make(map[int][]int)}
 		dec.embed(t, []int{})
 		ocache[t] = dec
 	}
@@ -279,9 +275,6 @@ func (o *O) Decode(data interface{}) {
 		} else {
 			complain(t, o.Os[i].T)
 		}
-	}
-	if dec.overflow != -1 {
-		v.Field(dec.overflow).Set(reflect.ValueOf(o.Os))
 	}
 }
 
