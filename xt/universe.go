@@ -21,9 +21,10 @@ type Sector struct {
 	Qthink int `x3t:"o:qthink"`
 	Qbuild int `x3t:"o:qbuild"`
 
-	Suns []Sun `x3t:"ot:3"`
-
-	Asteroids []Asteroid `x3t:"ot:17"`
+	Suns       []Sun      `x3t:"ot:3"`
+	Asteroids  []Asteroid `x3t:"ot:17"`
+	Background Background `x3t:"ot:2"`
+	Planets    []Planet   `x3t:"ot:4"`
 }
 
 func (s *Sector) SunPercent() int {
@@ -62,6 +63,23 @@ type Sun struct {
 	Z     int `x3t:"o:z"`
 	Color int `x3t:"o:color"`
 	F     int `x3t:"o:f"`
+}
+
+type Background struct {
+	S     int `x3t:"o:s"`
+	Neb   int `x3t:"o:neb"`
+	Stars int `x3t:"o:stars"`
+}
+
+type Planet struct {
+	F     int `x3t:"o:f"`
+	T     int `x3t:"o:t"`
+	S     int `x3t:"o:s"`
+	X     int `x3t:"o:x"`
+	Y     int `x3t:"o:y"`
+	Z     int `x3t:"o:z"`
+	Color int `x3t:"o:color"`
+	Fn    int `x3t:"o:fn"`
 }
 
 type Universe struct {
@@ -147,9 +165,15 @@ func (o *O) Decode(data interface{}) {
 	for i := range o.Os {
 		if f, ok := dec.ts[o.Os[i].T]; ok {
 			field := v.Field(f)
-			field = reflect.Append(field, reflect.Zero(field.Type().Elem()))
-			v.Field(f).Set(field)
-			o.Os[i].Decode(field.Index(field.Len() - 1).Addr().Interface())
+			typ := field.Type()
+			switch typ.Kind() {
+			case reflect.Slice:
+				field = reflect.Append(field, reflect.Zero(typ.Elem()))
+				v.Field(f).Set(field)
+				o.Os[i].Decode(field.Index(field.Len() - 1).Addr().Interface())
+			case reflect.Struct:
+				o.Os[i].Decode(field.Addr().Interface())
+			}
 		} else {
 			complain(t, o.Os[i].T)
 		}
