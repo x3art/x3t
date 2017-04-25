@@ -172,15 +172,10 @@ type Universe struct {
 	Sectors []Sector `x3t:"ot:1"`
 }
 
-type O struct {
-	Attrs []xml.Attr `xml:",any,attr"`
-	Os    []O        `xml:"o"`
-}
-
-func (o *O) T() int {
-	for i := range o.Attrs {
-		if o.Attrs[i].Name.Local == "t" {
-			i, err := strconv.Atoi(o.Attrs[i].Value)
+func t(attrs []xml.Attr) int {
+	for i := range attrs {
+		if attrs[i].Name.Local == "t" {
+			i, err := strconv.Atoi(attrs[i].Value)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -199,21 +194,15 @@ type odec struct {
 type odecoder struct {
 	fields map[string]odec
 	ts     map[int][]int
+
+	complaints map[int]bool // to avoid spamming the output, just complain about each missing t once.
 }
 
-type complaint struct {
-	st reflect.Type
-	ot int
-}
-
-var complainOnce = map[complaint]bool{}
-
-func complain(st reflect.Type, ot int) {
-	c := complaint{st, ot}
-	if complainOnce[c] {
+func (dec *odecoder) complain(st reflect.Type, ot int) {
+	if dec.complaints[ot] {
 		return
 	}
-	complainOnce[c] = true
+	dec.complaints[ot] = true
 	log.Printf("struct %v should hande ot: %d\n", st, ot)
 }
 
@@ -272,46 +261,71 @@ func (dec *odecoder) attrs(v reflect.Value, attrs []xml.Attr) {
 	}
 }
 
-func (dec *odecoder) o(v reflect.Value, o *O) {
-	ot := o.T()
-	if f, ok := dec.ts[ot]; ok {
-		field := v.FieldByIndex(f)
-		typ := field.Type()
-		switch typ.Kind() {
-		case reflect.Slice:
-			field.Set(reflect.Append(field, reflect.Zero(typ.Elem())))
-			o.Decode(field.Index(field.Len() - 1))
-		case reflect.Struct:
-			o.Decode(field)
+func nextEl(d *xml.Decoder, n string) (bool, *xml.StartElement) {
+	t, err := d.Token()
+	if t == nil {
+		return false, nil
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	switch t.(type) {
+	case xml.StartElement:
+		e := t.(xml.StartElement)
+		if e.Name.Local != n {
+			log.Fatalf("wrong start element: %v", t)
 		}
-	} else {
-		complain(v.Type(), ot)
+		return true, &e
+	case xml.EndElement:
+		return false, nil
+	case xml.ProcInst, xml.CharData, xml.Comment:
+		return nextEl(d, n)
+	default:
+		log.Fatalf("unhandled token: %#v", t)
 	}
+	return false, nil
 }
 
-func (o *O) Decode(v reflect.Value) {
+func elem(d *xml.Decoder, el *xml.StartElement, v reflect.Value) {
 	dec := decoder(v.Type())
-	dec.attrs(v, o.Attrs)
-	for i := range o.Os {
-		dec.o(v, &o.Os[i])
+	dec.attrs(v, el.Attr)
+	for {
+		next, el := nextEl(d, "o")
+		if !next {
+			return
+		}
+		ot := t(el.Attr)
+		if f, ok := dec.ts[ot]; ok {
+			field := v.FieldByIndex(f)
+			typ := field.Type()
+			switch typ.Kind() {
+			case reflect.Slice:
+				field.Set(reflect.Append(field, reflect.Zero(typ.Elem())))
+				elem(d, el, field.Index(field.Len()-1))
+			case reflect.Struct:
+				elem(d, el, field)
+			default:
+				log.Fatal("bad kind")
+			}
+		} else {
+			dec.complain(v.Type(), ot)
+		}
 	}
 }
 
-func GetUniverse(n string) Universe {
+func GetUniverse(n string) (u Universe) {
 	f, err := os.Open(n)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer f.Close()
 	d := xml.NewDecoder(f)
-	uo := O{}
-	if err := d.Decode(&uo); err != nil {
-		log.Fatal(err)
+	ok, el := nextEl(d, "universe")
+	if !ok {
+		log.Fatal("not universe")
 	}
 
-	u := Universe{}
-
-	uo.Decode(reflect.Indirect(reflect.ValueOf(&u)))
+	elem(d, el, reflect.Indirect(reflect.ValueOf(&u)))
 
 	return u
 }
