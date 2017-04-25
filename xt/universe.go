@@ -27,6 +27,9 @@ type Sector struct {
 	Planets    []Planet   `x3t:"ot:4"`
 	Docks      []Dock     `x3t:"ot:5"`
 	Factories  []Factory  `x3t:"ot:6"`
+	Gates      []Gate     `x3t:"ot:18"`
+	Ships      []UShip    `x3t:"ot:7"`
+	Specials   []Special  `x3t:"ot:20"`
 }
 
 func (s *Sector) SunPercent() int {
@@ -87,12 +90,21 @@ type Planet struct {
 	Fn    int `x3t:"o:fn"`
 }
 
-type station struct {
+type race struct {
+	R int `x3t:"o:r"`
+}
+
+type id struct {
 	Id int `x3t:"o:id"`
-	F  int `x3t:"o:f"`
+}
+
+type station struct {
+	id
+	F int `x3t:"o:f"`
 	pos
 	rot
-	R int `x3t:"o:r"`
+	race
+	CCs []CustomisableContainer `x3t:"ot:23"`
 }
 
 type Dock struct {
@@ -106,6 +118,56 @@ type Factory struct {
 	station
 }
 
+type Gate struct {
+	id
+	Gid int `x3t:"o:gid"`
+	pos
+	rot
+	S    int `x3t:"o:s"`
+	Gx   int `x3t:"o:gx"`
+	Gy   int `x3t:"o:gy"`
+	Gtid int `x3t:"o:gtid"`
+	F    int `x3t:"o:f"`
+}
+
+type UShip struct { // Name conflict, sigh.
+	id
+	S string `x3t:"o:s"`
+	F int    `x3t:"o:f"`
+	pos
+	race
+}
+
+type Special struct {
+	id
+	S string `x3t:"o:s"`
+	pos
+	rot
+	V int `x3t:"o:v"`
+}
+
+type CustomisableContainer struct {
+	S        int    `x3t:"o:s"`
+	Lasers   []Ware `x3t:"ot:8"`
+	Shields  []Ware `x3t:"ot:9"`
+	Missiles []Ware `x3t:"ot:10"`
+	Energy   []Ware `x3t:"ot:11"`
+	Novelty  []Ware `x3t:"ot:12"`
+	Bio      []Ware `x3t:"ot:13"`
+	Food     []Ware `x3t:"ot:14"`
+	Mineral  []Ware `x3t:"ot:15"`
+	Tech     []Ware `x3t:"ot:16"`
+}
+
+type Ware struct {
+	id
+	F int    `x3t:"o:f"`
+	S string `x3t:"o:s"`
+	I int    `x3t:"o:i"`
+	pos
+	N int `x3t:"o:n"`
+}
+
 type Universe struct {
 	Sectors []Sector `x3t:"ot:1"`
 }
@@ -117,7 +179,7 @@ type odec struct {
 
 type odecoder struct {
 	fields   map[string]odec
-	ts       map[int]int
+	ts       map[int][]int
 	overflow int
 }
 
@@ -165,7 +227,7 @@ func (dec *odecoder) embed(t reflect.Type, index []int) {
 			if err != nil {
 				log.Fatal(err)
 			}
-			dec.ts[typ] = i
+			dec.ts[typ] = append(index, i)
 		}
 	}
 }
@@ -173,7 +235,7 @@ func (dec *odecoder) embed(t reflect.Type, index []int) {
 func decoder(t reflect.Type) *odecoder {
 	dec := ocache[t]
 	if dec == nil {
-		dec = &odecoder{fields: make(map[string]odec), ts: make(map[int]int), overflow: -1}
+		dec = &odecoder{fields: make(map[string]odec), ts: make(map[int][]int), overflow: -1}
 		dec.embed(t, []int{})
 		ocache[t] = dec
 	}
@@ -199,17 +261,17 @@ func (o *O) Decode(data interface{}) {
 				log.Fatal("unknown field type")
 			}
 		} else {
-			log.Printf("unknown attr %v: %v", attr.Name.Local, attr.Value)
+			log.Printf("unknown attr %v.%v: %v", t, attr.Name.Local, attr.Value)
 		}
 	}
 	for i := range o.Os {
 		if f, ok := dec.ts[o.Os[i].T]; ok {
-			field := v.Field(f)
+			field := v.FieldByIndex(f)
 			typ := field.Type()
 			switch typ.Kind() {
 			case reflect.Slice:
 				field = reflect.Append(field, reflect.Zero(typ.Elem()))
-				v.Field(f).Set(field)
+				v.FieldByIndex(f).Set(field)
 				o.Os[i].Decode(field.Index(field.Len() - 1).Addr().Interface())
 			case reflect.Struct:
 				o.Os[i].Decode(field.Addr().Interface())
