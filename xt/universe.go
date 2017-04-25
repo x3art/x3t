@@ -25,6 +25,8 @@ type Sector struct {
 	Asteroids  []Asteroid `x3t:"ot:17"`
 	Background Background `x3t:"ot:2"`
 	Planets    []Planet   `x3t:"ot:4"`
+	Docks      []Dock     `x3t:"ot:5"`
+	Factories  []Factory  `x3t:"ot:6"`
 }
 
 func (s *Sector) SunPercent() int {
@@ -79,11 +81,29 @@ type Background struct {
 
 type Planet struct {
 	F int `x3t:"o:f"`
-	T int `x3t:"o:t"`
 	S int `x3t:"o:s"`
 	pos
 	Color int `x3t:"o:color"`
 	Fn    int `x3t:"o:fn"`
+}
+
+type station struct {
+	Id int `x3t:"o:id"`
+	F  int `x3t:"o:f"`
+	pos
+	rot
+	R int `x3t:"o:r"`
+}
+
+type Dock struct {
+	S string `x3t:"o:s"`
+	station
+	N int `x3t:"o:n"`
+}
+
+type Factory struct {
+	S string `x3t:"o:s"`
+	station
 }
 
 type Universe struct {
@@ -167,10 +187,12 @@ func (o *O) Decode(data interface{}) {
 	for _, attr := range o.Attrs {
 		if d, ok := dec.fields[attr.Name.Local]; ok {
 			switch d.k {
+			case reflect.String:
+				v.FieldByIndex(d.i).SetString(attr.Value)
 			case reflect.Int:
 				i, err := strconv.Atoi(attr.Value)
 				if err != nil {
-					log.Fatal(err)
+					log.Fatalf("%v.%s: %v", t, attr.Name.Local, err)
 				}
 				v.FieldByIndex(d.i).SetInt(int64(i))
 			default:
