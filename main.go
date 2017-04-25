@@ -38,7 +38,7 @@ func main() {
 	for i := range u.Sectors {
 		s := &u.Sectors[i]
 		if s.X == 8 && s.Y == 6 {
-			fmt.Printf("%s: %d | %v\n", s.Name(text), s.SunPercent, s.Suns)
+			fmt.Printf("%s: %d | %v\n", s.Name(text), s.SunPercent(), s.Suns)
 		}
 	}
 }

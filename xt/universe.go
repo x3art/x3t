@@ -24,8 +24,7 @@ type Sector struct {
 
 	Os []O `x3t:"os"`
 
-	Suns       []Sun
-	SunPercent int
+	Suns []Sun
 
 	Asteroids []Asteroid
 }
@@ -52,29 +51,22 @@ func (s *Sector) decodeOs() {
 			fmt.Printf("unknown type %d\n", o.T)
 		}
 	}
+}
+
+func (s *Sector) SunPercent() int {
 	if len(s.Suns) == 1 {
 		if s.Suns[0].S == 0 {
-			s.SunPercent = 100
+			return 100
 		} else {
-			s.SunPercent = 150
+			return 150
 		}
 	} else {
-		s.SunPercent = 100 * len(s.Suns)
+		return 100 * len(s.Suns)
 	}
 }
 
 func (s *Sector) Name(text Text) string {
 	return text[7][1020000+100*(s.Y+1)+(s.X+1)]
-}
-
-type O struct {
-	T     int        `xml:"t,attr"`
-	Attrs []xml.Attr `xml:",any,attr"`
-	Os    []O        `xml:"o"`
-}
-
-type Universe struct {
-	Sectors []Sector `xml:"o"`
 }
 
 type Asteroid struct {
@@ -103,9 +95,20 @@ type odec struct {
 	i int
 	k reflect.Kind
 }
+
 type odecoder struct {
 	fields   map[string]odec
 	overflow int
+}
+
+type O struct {
+	T     int        `xml:"t,attr"`
+	Attrs []xml.Attr `xml:",any,attr"`
+	Os    []O        `xml:"o"`
+}
+
+type Universe struct {
+	Sectors []Sector
 }
 
 var ocache = map[reflect.Type]*odecoder{}
