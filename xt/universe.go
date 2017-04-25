@@ -2,7 +2,6 @@ package xt
 
 import (
 	"encoding/xml"
-	"fmt"
 	"log"
 	"os"
 	"reflect"
@@ -22,35 +21,9 @@ type Sector struct {
 	Qthink int `x3t:"o:qthink"`
 	Qbuild int `x3t:"o:qbuild"`
 
-	Os []O `x3t:"os"`
+	Suns []Sun `x3t:"ot:3"`
 
-	Suns []Sun
-
-	Asteroids []Asteroid
-}
-
-func (s *Sector) decodeOs() {
-	for i := range s.Os {
-		o := &s.Os[i]
-		switch o.T {
-		case 2: // Background
-		case 3:
-			s.Suns = append(s.Suns, Sun{})
-			o.Decode(&s.Suns[len(s.Suns)-1])
-		case 4: // Planets
-		case 5: // Trading Dock
-		case 6: // Factories Shipyards
-		case 7: // Ships
-		case 8, 9, 10, 11, 12, 13, 14, 15, 16: // Wares
-		case 17: // Asteroids
-			s.Asteroids = append(s.Asteroids, Asteroid{})
-			o.Decode(&s.Asteroids[len(s.Asteroids)-1])
-		case 18: // Gates
-		case 20: // Specials
-		default:
-			fmt.Printf("unknown type %d\n", o.T)
-		}
-	}
+	Asteroids []Asteroid `x3t:"ot:17"`
 }
 
 func (s *Sector) SunPercent() int {
@@ -91,6 +64,10 @@ type Sun struct {
 	F     int `x3t:"o:f"`
 }
 
+type Universe struct {
+	Sectors []Sector `x3t:"ot:1"`
+}
+
 type odec struct {
 	i int
 	k reflect.Kind
@@ -98,6 +75,7 @@ type odec struct {
 
 type odecoder struct {
 	fields   map[string]odec
+	ts       map[int]int
 	overflow int
 }
 
@@ -107,10 +85,6 @@ type O struct {
 	Os    []O        `xml:"o"`
 }
 
-type Universe struct {
-	Sectors []Sector
-}
-
 var ocache = map[reflect.Type]*odecoder{}
 
 func (o *O) Decode(data interface{}) {
@@ -118,7 +92,7 @@ func (o *O) Decode(data interface{}) {
 	t := v.Type()
 	dec := ocache[t]
 	if dec == nil {
-		dec = &odecoder{fields: make(map[string]odec), overflow: -1}
+		dec = &odecoder{fields: make(map[string]odec), ts: make(map[int]int), overflow: -1}
 		for i := 0; i < t.NumField(); i++ {
 			tag := t.Field(i).Tag.Get("x3t")
 			tp := tagParse(tag)
@@ -127,6 +101,13 @@ func (o *O) Decode(data interface{}) {
 			}
 			if tp["os"] != "" {
 				dec.overflow = i
+			}
+			if ot := tp["ot"]; ot != "" {
+				typ, err := strconv.Atoi(ot)
+				if err != nil {
+					log.Fatal(err)
+				}
+				dec.ts[typ] = i
 			}
 		}
 		ocache[t] = dec
@@ -147,6 +128,14 @@ func (o *O) Decode(data interface{}) {
 			log.Printf("unknown attr %v: %v", attr.Name.Local, attr.Value)
 		}
 	}
+	for i := range o.Os {
+		if f, ok := dec.ts[o.Os[i].T]; ok {
+			field := v.Field(f)
+			field = reflect.Append(field, reflect.Zero(field.Type().Elem()))
+			v.Field(f).Set(field)
+			o.Os[i].Decode(field.Index(field.Len() - 1).Addr().Interface())
+		}
+	}
 	if dec.overflow != -1 {
 		v.Field(dec.overflow).Set(reflect.ValueOf(o.Os))
 	}
@@ -159,23 +148,13 @@ func GetUniverse(n string) Universe {
 	}
 	defer f.Close()
 	d := xml.NewDecoder(f)
-
 	uo := O{}
 	if err := d.Decode(&uo); err != nil {
 		log.Fatal(err)
 	}
 
 	u := Universe{}
-	for i := range uo.Os {
-		o := &uo.Os[i]
-		if o.T == 1 {
-			u.Sectors = append(u.Sectors, Sector{})
-			o.Decode(&u.Sectors[len(u.Sectors)-1])
-		}
-	}
-	for i := range u.Sectors {
-		u.Sectors[i].decodeOs()
-	}
+	uo.Decode(&u)
 
 	return u
 }
