@@ -172,6 +172,12 @@ type Universe struct {
 	Sectors []Sector `x3t:"ot:1"`
 }
 
+type O struct {
+	T     int        `xml:"t,attr"`
+	Attrs []xml.Attr `xml:",any,attr"`
+	Os    []O        `xml:"o"`
+}
+
 type odec struct {
 	i []int
 	k reflect.Kind
@@ -181,14 +187,6 @@ type odecoder struct {
 	fields map[string]odec
 	ts     map[int][]int
 }
-
-type O struct {
-	T     int        `xml:"t,attr"`
-	Attrs []xml.Attr `xml:",any,attr"`
-	Os    []O        `xml:"o"`
-}
-
-var ocache = map[reflect.Type]*odecoder{}
 
 type complaint struct {
 	st reflect.Type
@@ -213,8 +211,7 @@ func (dec *odecoder) embed(t reflect.Type, index []int) {
 			dec.embed(field.Type, append(index, i))
 			continue
 		}
-		tag := field.Tag.Get("x3t")
-		tp := tagParse(tag)
+		tp := tagParse(field.Tag.Get("x3t"))
 		if ofield := tp["o"]; ofield != "" {
 			dec.fields[ofield] = odec{append(index, i), field.Type.Kind()}
 		}
@@ -227,6 +224,8 @@ func (dec *odecoder) embed(t reflect.Type, index []int) {
 		}
 	}
 }
+
+var ocache = map[reflect.Type]*odecoder{}
 
 func decoder(t reflect.Type) *odecoder {
 	dec := ocache[t]
@@ -266,8 +265,7 @@ func (o *O) Decode(data interface{}) {
 			typ := field.Type()
 			switch typ.Kind() {
 			case reflect.Slice:
-				field = reflect.Append(field, reflect.Zero(typ.Elem()))
-				v.FieldByIndex(f).Set(field)
+				field.Set(reflect.Append(field, reflect.Zero(typ.Elem())))
 				o.Os[i].Decode(field.Index(field.Len() - 1).Addr().Interface())
 			case reflect.Struct:
 				o.Os[i].Decode(field.Addr().Interface())
