@@ -87,6 +87,22 @@ type O struct {
 
 var ocache = map[reflect.Type]*odecoder{}
 
+type complaint struct {
+	st reflect.Type
+	ot int
+}
+
+var complainOnce = map[complaint]bool{}
+
+func complain(st reflect.Type, ot int) {
+	c := complaint{st, ot}
+	if complainOnce[c] {
+		return
+	}
+	complainOnce[c] = true
+	log.Printf("struct %v should hande ot: %d\n", st, ot)
+}
+
 func (o *O) Decode(data interface{}) {
 	v := reflect.Indirect(reflect.ValueOf(data))
 	t := v.Type()
@@ -134,6 +150,8 @@ func (o *O) Decode(data interface{}) {
 			field = reflect.Append(field, reflect.Zero(field.Type().Elem()))
 			v.Field(f).Set(field)
 			o.Os[i].Decode(field.Index(field.Len() - 1).Addr().Interface())
+		} else {
+			complain(t, o.Os[i].T)
 		}
 	}
 	if dec.overflow != -1 {
