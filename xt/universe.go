@@ -280,17 +280,16 @@ func (dec *odecoder) o(v reflect.Value, o *O) {
 		switch typ.Kind() {
 		case reflect.Slice:
 			field.Set(reflect.Append(field, reflect.Zero(typ.Elem())))
-			o.Decode(field.Index(field.Len() - 1).Addr().Interface())
+			o.Decode(field.Index(field.Len() - 1))
 		case reflect.Struct:
-			o.Decode(field.Addr().Interface())
+			o.Decode(field)
 		}
 	} else {
 		complain(v.Type(), ot)
 	}
 }
 
-func (o *O) Decode(data interface{}) {
-	v := reflect.Indirect(reflect.ValueOf(data))
+func (o *O) Decode(v reflect.Value) {
 	dec := decoder(v.Type())
 	dec.attrs(v, o.Attrs)
 	for i := range o.Os {
@@ -311,7 +310,8 @@ func GetUniverse(n string) Universe {
 	}
 
 	u := Universe{}
-	uo.Decode(&u)
+
+	uo.Decode(reflect.Indirect(reflect.ValueOf(&u)))
 
 	return u
 }
