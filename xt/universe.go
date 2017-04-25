@@ -173,9 +173,22 @@ type Universe struct {
 }
 
 type O struct {
-	T     int        `xml:"t,attr"`
 	Attrs []xml.Attr `xml:",any,attr"`
 	Os    []O        `xml:"o"`
+}
+
+func (o *O) T() int {
+	for i := range o.Attrs {
+		if o.Attrs[i].Name.Local == "t" {
+			i, err := strconv.Atoi(o.Attrs[i].Value)
+			if err != nil {
+				log.Fatal(err)
+			}
+			return i
+		}
+	}
+	log.Fatal("no t")
+	return -1
 }
 
 type odec struct {
@@ -237,11 +250,9 @@ func decoder(t reflect.Type) *odecoder {
 	return dec
 }
 
-func (o *O) Decode(data interface{}) {
-	v := reflect.Indirect(reflect.ValueOf(data))
-	t := v.Type()
-	dec := decoder(t)
-	for _, attr := range o.Attrs {
+func (dec *odecoder) attrs(v reflect.Value, attrs []xml.Attr) {
+	for a := range attrs {
+		attr := &attrs[a]
 		if d, ok := dec.fields[attr.Name.Local]; ok {
 			switch d.k {
 			case reflect.String:
@@ -249,30 +260,41 @@ func (o *O) Decode(data interface{}) {
 			case reflect.Int:
 				i, err := strconv.Atoi(attr.Value)
 				if err != nil {
-					log.Fatalf("%v.%s: %v", t, attr.Name.Local, err)
+					log.Fatalf("%v.%s: %v", v.Type(), attr.Name.Local, err)
 				}
 				v.FieldByIndex(d.i).SetInt(int64(i))
 			default:
 				log.Fatal("unknown field type")
 			}
-		} else {
-			log.Printf("unknown attr %v.%v: %v", t, attr.Name.Local, attr.Value)
+		} else if attr.Name.Local != "t" {
+			log.Printf("unknown attr %v.%v: %v", v.Type(), attr.Name.Local, attr.Value)
 		}
 	}
-	for i := range o.Os {
-		if f, ok := dec.ts[o.Os[i].T]; ok {
-			field := v.FieldByIndex(f)
-			typ := field.Type()
-			switch typ.Kind() {
-			case reflect.Slice:
-				field.Set(reflect.Append(field, reflect.Zero(typ.Elem())))
-				o.Os[i].Decode(field.Index(field.Len() - 1).Addr().Interface())
-			case reflect.Struct:
-				o.Os[i].Decode(field.Addr().Interface())
-			}
-		} else {
-			complain(t, o.Os[i].T)
+}
+
+func (dec *odecoder) o(v reflect.Value, o *O) {
+	ot := o.T()
+	if f, ok := dec.ts[ot]; ok {
+		field := v.FieldByIndex(f)
+		typ := field.Type()
+		switch typ.Kind() {
+		case reflect.Slice:
+			field.Set(reflect.Append(field, reflect.Zero(typ.Elem())))
+			o.Decode(field.Index(field.Len() - 1).Addr().Interface())
+		case reflect.Struct:
+			o.Decode(field.Addr().Interface())
 		}
+	} else {
+		complain(v.Type(), ot)
+	}
+}
+
+func (o *O) Decode(data interface{}) {
+	v := reflect.Indirect(reflect.ValueOf(data))
+	dec := decoder(v.Type())
+	dec.attrs(v, o.Attrs)
+	for i := range o.Os {
+		dec.o(v, &o.Os[i])
 	}
 }
 
