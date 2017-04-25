@@ -2,8 +2,12 @@ package xt
 
 import (
 	"encoding/xml"
+	"fmt"
 	"log"
 	"os"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 type PageXML struct {
@@ -59,4 +63,35 @@ func GetText(n string) Text {
 	merge(350000, 380000)
 	merge(380000, 600000)
 	return ret
+}
+
+var reCurly = regexp.MustCompile("\\{([[:digit:]]+),([[:digit:]]+)\\}")
+var reParen = regexp.MustCompile("\\(.*\\)")
+
+func (t Text) Get(pid, tid int) (string, error) {
+	if t[pid] == nil {
+		return "", fmt.Errorf("Bad page: %d", pid)
+	}
+	if t[pid][tid] == "" {
+		// This can't be fatal (yet?).
+		log.Printf("bad string ID: %d/%d", pid, tid)
+		return fmt.Sprintf("bad string %d,%d", pid, tid), nil
+	}
+	s := t[pid][tid]
+	if m := reCurly.FindStringSubmatch(s); len(m) > 0 {
+		pid, err := strconv.Atoi(m[1])
+		if err != nil {
+			return "", fmt.Errorf("Bad page id: %v", m[1])
+		}
+		tid, err := strconv.Atoi(m[2])
+		if err != nil {
+			return "", fmt.Errorf("Bad text id: %v", m[2])
+		}
+		repl, err := t.Get(pid, tid)
+		if err != nil {
+			return "", err
+		}
+		s = reCurly.ReplaceAllString(s, repl)
+	}
+	return strings.TrimSpace(reParen.ReplaceAllString(s, "")), nil
 }
