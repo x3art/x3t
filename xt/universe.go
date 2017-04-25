@@ -10,19 +10,19 @@ import (
 )
 
 type Sector struct {
-	F      int `xml:"f,attr"`
-	X      int `xml:"x,attr"`
-	Y      int `xml:"y,attr"`
-	R      int `xml:"r,attr"`
-	Size   int `xml:"size,attr"`
-	M      int `xml:"m,attr"`
-	P      int `xml:"p,attr"`
-	Qtrade int `xml:"qtrade,attr"`
-	Qfight int `xml:"qfight,attr"`
-	Qthink int `xml:"qthink,attr"`
-	Qbuild int `xml:"qbuild,attr"`
+	F      int `x3t:"o:f"`
+	X      int `x3t:"o:x"`
+	Y      int `x3t:"o:y"`
+	R      int `x3t:"o:r"`
+	Size   int `x3t:"o:size"`
+	M      int `x3t:"o:m"`
+	P      int `x3t:"o:p"`
+	Qtrade int `x3t:"o:qtrade"`
+	Qfight int `x3t:"o:qfight"`
+	Qthink int `x3t:"o:qthink"`
+	Qbuild int `x3t:"o:qbuild"`
 
-	Os []O `xml:"o"`
+	Os []O `x3t:"os"`
 
 	Suns       []Sun
 	SunPercent int
@@ -103,27 +103,33 @@ type odec struct {
 	i int
 	k reflect.Kind
 }
-type odecoder map[string]odec
+type odecoder struct {
+	fields   map[string]odec
+	overflow int
+}
 
-var ocache = map[reflect.Type]odecoder{}
+var ocache = map[reflect.Type]*odecoder{}
 
 func (o *O) Decode(data interface{}) {
 	v := reflect.Indirect(reflect.ValueOf(data))
 	t := v.Type()
 	dec := ocache[t]
 	if dec == nil {
-		dec = make(odecoder)
+		dec = &odecoder{fields: make(map[string]odec), overflow: -1}
 		for i := 0; i < t.NumField(); i++ {
 			tag := t.Field(i).Tag.Get("x3t")
 			tp := tagParse(tag)
 			if field := tp["o"]; field != "" {
-				dec[field] = odec{i, t.Field(i).Type.Kind()}
+				dec.fields[field] = odec{i, t.Field(i).Type.Kind()}
+			}
+			if tp["os"] != "" {
+				dec.overflow = i
 			}
 		}
 		ocache[t] = dec
 	}
 	for _, attr := range o.Attrs {
-		if d, ok := dec[attr.Name.Local]; ok {
+		if d, ok := dec.fields[attr.Name.Local]; ok {
 			switch d.k {
 			case reflect.Int:
 				i, err := strconv.Atoi(attr.Value)
@@ -138,6 +144,9 @@ func (o *O) Decode(data interface{}) {
 			log.Printf("unknown attr %v: %v", attr.Name.Local, attr.Value)
 		}
 	}
+	if dec.overflow != -1 {
+		v.Field(dec.overflow).Set(reflect.ValueOf(o.Os))
+	}
 }
 
 func GetUniverse(n string) Universe {
@@ -147,11 +156,20 @@ func GetUniverse(n string) Universe {
 	}
 	defer f.Close()
 	d := xml.NewDecoder(f)
-	u := Universe{}
-	if err := d.Decode(&u); err != nil {
+
+	uo := O{}
+	if err := d.Decode(&uo); err != nil {
 		log.Fatal(err)
 	}
 
+	u := Universe{}
+	for i := range uo.Os {
+		o := &uo.Os[i]
+		if o.T == 1 {
+			u.Sectors = append(u.Sectors, Sector{})
+			o.Decode(&u.Sectors[len(u.Sectors)-1])
+		}
+	}
 	for i := range u.Sectors {
 		u.Sectors[i].decodeOs()
 	}
