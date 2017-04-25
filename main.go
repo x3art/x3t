@@ -20,6 +20,7 @@ type state struct {
 	ships    []xt.Ship
 	cockpits []xt.Cockpit
 	lasers   []xt.Laser
+	u        xt.Universe
 }
 
 func main() {
@@ -41,6 +42,7 @@ func main() {
 		ships:    xt.GetShips(*shipsFile, text),
 		cockpits: xt.GetCockpits(*cockpitsFile, text),
 		lasers:   xt.GetLasers(*lasersFile, text),
+		u:        xt.GetUniverse(*universeFile),
 	}
 
 	http.HandleFunc("/ship/", st.ship)
