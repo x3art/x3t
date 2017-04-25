@@ -43,24 +43,30 @@ func (s *Sector) Name(text Text) string {
 	return text[7][1020000+100*(s.Y+1)+(s.X+1)]
 }
 
+type pos struct {
+	X int `x3t:"o:x"`
+	Y int `x3t:"o:y"`
+	Z int `x3t:"o:z"`
+}
+
+type rot struct {
+	A int `x3t:"o:a"`
+	B int `x3t:"o:b"`
+	G int `x3t:"o:g"`
+}
+
 type Asteroid struct {
 	Type   int `x3t:"o:atype"`
 	Amount int `x3t:"o:aamount"`
 	S      int `x3t:"o:s"`
-	X      int `x3t:"o:x"`
-	Y      int `x3t:"o:y"`
-	Z      int `x3t:"o:z"`
-	A      int `x3t:"o:a"`
-	B      int `x3t:"o:b"`
-	G      int `x3t:"o:g"`
-	F      int `x3t:"o:f"`
+	pos
+	rot
+	F int `x3t:"o:f"`
 }
 
 type Sun struct {
-	S     int `x3t:"o:s"`
-	X     int `x3t:"o:x"`
-	Y     int `x3t:"o:y"`
-	Z     int `x3t:"o:z"`
+	S int `x3t:"o:s"`
+	pos
 	Color int `x3t:"o:color"`
 	F     int `x3t:"o:f"`
 }
@@ -72,12 +78,10 @@ type Background struct {
 }
 
 type Planet struct {
-	F     int `x3t:"o:f"`
-	T     int `x3t:"o:t"`
-	S     int `x3t:"o:s"`
-	X     int `x3t:"o:x"`
-	Y     int `x3t:"o:y"`
-	Z     int `x3t:"o:z"`
+	F int `x3t:"o:f"`
+	T int `x3t:"o:t"`
+	S int `x3t:"o:s"`
+	pos
 	Color int `x3t:"o:color"`
 	Fn    int `x3t:"o:fn"`
 }
@@ -87,7 +91,7 @@ type Universe struct {
 }
 
 type odec struct {
-	i int
+	i []int
 	k reflect.Kind
 }
 
@@ -121,31 +125,45 @@ func complain(st reflect.Type, ot int) {
 	log.Printf("struct %v should hande ot: %d\n", st, ot)
 }
 
-func (o *O) Decode(data interface{}) {
-	v := reflect.Indirect(reflect.ValueOf(data))
-	t := v.Type()
+func (dec *odecoder) embed(t reflect.Type, index []int) {
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if field.Anonymous {
+			dec.embed(field.Type, append(index, i))
+			continue
+		}
+		tag := field.Tag.Get("x3t")
+		tp := tagParse(tag)
+		if ofield := tp["o"]; ofield != "" {
+			dec.fields[ofield] = odec{append(index, i), field.Type.Kind()}
+		}
+		if tp["os"] != "" {
+			dec.overflow = i
+		}
+		if ot := tp["ot"]; ot != "" {
+			typ, err := strconv.Atoi(ot)
+			if err != nil {
+				log.Fatal(err)
+			}
+			dec.ts[typ] = i
+		}
+	}
+}
+
+func decoder(t reflect.Type) *odecoder {
 	dec := ocache[t]
 	if dec == nil {
 		dec = &odecoder{fields: make(map[string]odec), ts: make(map[int]int), overflow: -1}
-		for i := 0; i < t.NumField(); i++ {
-			tag := t.Field(i).Tag.Get("x3t")
-			tp := tagParse(tag)
-			if field := tp["o"]; field != "" {
-				dec.fields[field] = odec{i, t.Field(i).Type.Kind()}
-			}
-			if tp["os"] != "" {
-				dec.overflow = i
-			}
-			if ot := tp["ot"]; ot != "" {
-				typ, err := strconv.Atoi(ot)
-				if err != nil {
-					log.Fatal(err)
-				}
-				dec.ts[typ] = i
-			}
-		}
+		dec.embed(t, []int{})
 		ocache[t] = dec
 	}
+	return dec
+}
+
+func (o *O) Decode(data interface{}) {
+	v := reflect.Indirect(reflect.ValueOf(data))
+	t := v.Type()
+	dec := decoder(t)
 	for _, attr := range o.Attrs {
 		if d, ok := dec.fields[attr.Name.Local]; ok {
 			switch d.k {
@@ -154,7 +172,7 @@ func (o *O) Decode(data interface{}) {
 				if err != nil {
 					log.Fatal(err)
 				}
-				v.Field(d.i).SetInt(int64(i))
+				v.FieldByIndex(d.i).SetInt(int64(i))
 			default:
 				log.Fatal("unknown field type")
 			}
