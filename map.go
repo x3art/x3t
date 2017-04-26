@@ -8,60 +8,49 @@ import (
 var _ = tmpls.Add("map", `
 {{template "header"}}
 <div style="width: 95%; height: 95%">
-	<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" height="100%" viewBox="0 0 23 18" id="themap">
+	<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" height="100%" viewBox="0 0 24 20" id="themap">
 		<style>
 			.s {
 				width: 0.8;
 				height: 0.8;
 				stroke: black;
 				stroke-width: 0.02;
-				fill: red;
-				fill-opacity: 1.0;
 			}
 			{{/*Argon*/}}
 			.r1 {
-				fill: blue;
-				fill-opacity: 0.4;
+				fill: #a0a0ff;
 			}
 			{{/*Boron*/}}
 			.r2 {
-				fill: green;
-				fill-opacity: 0.6;
+				fill: #a0ffa0;
 			}
 			{{/*Split*/}}
 			.r3 {
-				fill: purple;
-				fill-opacity: 0.6;
+				fill: #ffa0ff;
 			}
 			{{/*Paranid*/}}
 			.r4 {
-				fill: red;
-				fill-opacity: 0.6;
+				fill: #ffa0a0;
 			}
 			{{/*Teladi*/}}
 			.r5 {
-				fill: yellow;
-				fill-opacity: 0.6;
+				fill: #ffffa0;
 			}
 			{{/*Xenon*/}}
 			.r6 {
-				fill: brown;
-				fill-opacity: 0.6;
+				fill: #b06666;
 			}
 			{{/*Kha'ak*/}}
 			.r7 {
-				fill: brown;
-				fill-opacity: 0.4;
+				fill: #caa5a5;
 			}
 			{{/*Pirates*/}}
 			.r8 {
-				fill: black;
-				fill-opacity: 0.2;
+				fill: #727272;
 			}
 			{{/*Goner*/}}
 			.r9 {
-				fill: blue;
-				fill-opacity: 0.7;
+				fill: #6060ff;
 			}
 			{{/*ufo?*/}}
 			.r10 {
@@ -71,16 +60,14 @@ var _ = tmpls.Add("map", `
 			}
 			{{/*neutral*/}}
 			.r12 {
-				fill: black;
-				fill-opacity: 0.2;
+				fill: #a0a0a0;
 			}
 			{{/*friendly?*/}}
 			.r13 {
 			}
 			{{/*unknown*/}}
 			.r14 {
-				fill: black;
-				fill-opacity: 0.3;
+				fill: #a0a0a0;
 			}
 			{{/*unused?*/}}
 			.r15 {
@@ -90,21 +77,22 @@ var _ = tmpls.Add("map", `
 			}
 			{{/*ATF*/}}
 			.r17 {
-				fill: green;
-				fill-opacity: 0.2;
+				fill: #80ff80;
 			}
 			{{/*Terran*/}}
 			.r18 {
-				fill: green;
-				fill-opacity: 0.4;
+				fill: #b0ffb0;
 			}
 			{{/*Yaki*/}}
 			.r19 {
-				fill: yellow;
-				fill-opacity: 0.2;
+				fill: #ffff80;
 			}
 			.sectorname {
 				font-size: 1;
+			}
+			.zoomedsector {
+				transform: scale(3);
+				fill-opacity: 1.0;
 			}
 		</style>
 		<g>
@@ -114,21 +102,33 @@ var _ = tmpls.Add("map", `
 		</g>
 	</svg>
 </div>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script src='/js/svg-pan-zoom.min.js'></script>
 <script>
-var foo = svgPanZoom("#themap")
+svgPanZoom("#themap")
+$(document).ready(function() {
+	$("g.sector").hover(
+	  function() {
+	    this.parentElement.appendChild(this);
+	    $(this).find("g:first").addClass("zoomedsector");
+	  }, function() {
+	    $(this).find("g:first").removeClass("zoomedsector");
+  	});
+});
 </script>
 {{template "footer"}}
 `)
 
 var _ = tmpls.Add("map-sector", `
-<g transform="translate({{.X}} {{.Y}})">
+<g transform="translate({{.X}} {{.Y}})" class="sector">
+ <g>
   <rect class="s r{{.R}}" />
   <g transform="scale(0.12) translate(0.5 1.3)">
 {{- range $i, $row := (sectorName .)}}
     <text transform="translate(0 {{$i}})" class="sectorname">{{$row}}</text>
 {{- end}}
   </g>
+ </g>
 </g>
 `)
 
