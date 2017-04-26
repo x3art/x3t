@@ -57,6 +57,10 @@ func main() {
 	//	http.HandleFunc("/ships", st.shiplist)
 	http.HandleFunc("/map", st.showMap)
 
+	http.HandleFunc("/js/panzoom.min.js", func(w http.ResponseWriter, req *http.Request) {
+		http.ServeFile(w, req, "js/panzoom.min.js")
+	})
+
 	log.Printf("now")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
