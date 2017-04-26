@@ -8,7 +8,7 @@ import (
 var _ = tmpls.Add("map", `
 {{template "header"}}
 <div style="width: 95%; height: 95%">
-	<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" height="100%" viewBox="0 0 23 18">
+	<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" height="100%" viewBox="0 0 23 18" id="themap">
 		<style>
 			.s {
 				width: 0.8;
@@ -114,6 +114,10 @@ var _ = tmpls.Add("map", `
 		</g>
 	</svg>
 </div>
+<script src='/js/svg-pan-zoom.min.js'></script>
+<script>
+var foo = svgPanZoom("#themap")
+</script>
 {{template "footer"}}
 `)
 
