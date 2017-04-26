@@ -1,11 +1,11 @@
 package main
 
 import (
-	"html/template"
+	"log"
 	"net/http"
 )
 
-var _ = template.Must(tmpl.New("map").Parse(`
+var _ = tmpls.Add("map", `
 {{template "header"}}
 <div style="width: 95%; height: 95%">
 	<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" height="100%" viewBox="0 0 23 18">
@@ -112,12 +112,16 @@ var _ = template.Must(tmpl.New("map").Parse(`
 	</svg>
 </div>
 {{template "footer"}}
-`))
+`)
 
-var _ = template.Must(tmpl.New("map-sector").Parse(`
+var _ = tmpls.Add("map-sector", `
+<text x="{{.X}}" y="{{.Y}}" font-size="1">{{sectorName .}}</text>
 <rect x="{{.X}}" y="{{.Y}}" class="s r{{.R}}" />
-`))
+`)
 
 func (st *state) showMap(w http.ResponseWriter, req *http.Request) {
-	tmpl.ExecuteTemplate(w, "map", st.u)
+	err := st.tmpl.ExecuteTemplate(w, "map", st.u)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

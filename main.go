@@ -21,6 +21,7 @@ type state struct {
 	cockpits []xt.Cockpit
 	lasers   []xt.Laser
 	u        xt.Universe
+	tmpl     *template.Template
 }
 
 func main() {
@@ -48,6 +49,13 @@ func main() {
 	//	http.HandleFunc("/ship/", st.ship)
 	//	http.HandleFunc("/ships", st.shiplist)
 	http.HandleFunc("/map", st.showMap)
+
+	fm := make(template.FuncMap)
+	fm["sectorName"] = func(s xt.Sector) string {
+		return s.Name(st.text)
+	}
+	st.tmpl = tmpls.Compile(fm)
+
 	log.Printf("now")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 
@@ -68,7 +76,7 @@ func main() {
 	*/
 }
 
-var tmpl = template.Must(template.New("all").Parse(`
+var _ = tmpls.Add("all", `
 {{- define "header" -}}
 <html>
 <head>
@@ -81,9 +89,9 @@ var tmpl = template.Must(template.New("all").Parse(`
 </body>
 </html>
 {{- end -}}
-`))
+`)
 
-var _ = template.Must(tmpl.New("shiplist").Parse(`
+var _ = tmpls.Add("shiplist", `
 {{template "header"}}
  <ul>
 {{- range .}}
@@ -91,18 +99,18 @@ var _ = template.Must(tmpl.New("shiplist").Parse(`
 {{- end}}
  </ul>
 {{template "footer"}}
-`))
+`)
 
 func (st *state) shiplist(w http.ResponseWriter, req *http.Request) {
-	tmpl.ExecuteTemplate(w, "shiplist", st.ships)
+	st.tmpl.ExecuteTemplate(w, "shiplist", st.ships)
 }
 
-var _ = template.Must(tmpl.New("ship").Parse(`
+var _ = tmpls.Add("ship", `
 {{template "header"}}
   {{.Description}} {{.Variation}}<br/>
   Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
 {{template "footer"}}
-`))
+`)
 
 func (st *state) ship(w http.ResponseWriter, req *http.Request) {
 	s := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/ship/"), "/", 2)
@@ -118,7 +126,7 @@ func (st *state) ship(w http.ResponseWriter, req *http.Request) {
 
 	for i := range st.ships {
 		if st.ships[i].Description == name && st.ships[i].Variation == variation {
-			tmpl.ExecuteTemplate(w, "ship", st.ships[i])
+			st.tmpl.ExecuteTemplate(w, "ship", st.ships[i])
 			return
 		}
 	}
