@@ -45,7 +45,8 @@ func (s *Sector) SunPercent() int {
 }
 
 func (s *Sector) Name(text Text) string {
-	return text[7][1020000+100*(s.Y+1)+(s.X+1)]
+	r, _ := text.Get(7, 1020000+100*(s.Y+1)+(s.X+1))
+	return r
 }
 
 type pos struct {
