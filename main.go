@@ -38,15 +38,17 @@ func main() {
 		}
 	*/
 	st := state{
-		text:     text,
-		ships:    xt.GetShips(*shipsFile, text),
-		cockpits: xt.GetCockpits(*cockpitsFile, text),
-		lasers:   xt.GetLasers(*lasersFile, text),
-		u:        xt.GetUniverse(*universeFile),
+		text: text,
+		//		ships:    xt.GetShips(*shipsFile, text),
+		//		cockpits: xt.GetCockpits(*cockpitsFile, text),
+		//		lasers:   xt.GetLasers(*lasersFile, text),
+		u: xt.GetUniverse(*universeFile),
 	}
 
-	http.HandleFunc("/ship/", st.ship)
-	http.HandleFunc("/ships/", st.shiplist)
+	//	http.HandleFunc("/ship/", st.ship)
+	//	http.HandleFunc("/ships", st.shiplist)
+	http.HandleFunc("/map", st.showMap)
+	log.Printf("now")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 
 	/*
@@ -85,7 +87,7 @@ var _ = template.Must(tmpl.New("shiplist").Parse(`
 {{template "header"}}
  <ul>
 {{- range .}}
-  <li>{{.Description}} {{.Variation}}
+  <li><a href="/ship/{{.Description}}{{if .Variation}}/{{.Variation}}{{end}}">{{.Description}} {{.Variation}}</a>
 {{- end}}
  </ul>
 {{template "footer"}}
