@@ -27,53 +27,28 @@ type state struct {
 func main() {
 	flag.Parse()
 
-	text := xt.GetText(*textFile)
+	st := state{}
 
-	/*
-		u := xt.GetUniverse(*universeFile)
-		for i := range u.Sectors {
-			s := &u.Sectors[i]
-			if s.X == 8 && s.Y == 6 {
-				fmt.Printf("%s: %d | %v\n", s.Name(text), s.SunPercent(), s.Suns)
-			}
-		}
-	*/
-	st := state{
-		text: text,
-		//		ships:    xt.GetShips(*shipsFile, text),
-		//		cockpits: xt.GetCockpits(*cockpitsFile, text),
-		//		lasers:   xt.GetLasers(*lasersFile, text),
-		u: xt.GetUniverse(*universeFile),
+	st.text = xt.GetText(*textFile)
+
+	// st.ships = xt.GetShips(*shipsFile, text)
+	// st.cockpits = xt.GetCockpits(*cockpitsFile, text)
+	// st.lasers = xt.GetLasers(*lasersFile, text)
+	st.u = xt.GetUniverse(*universeFile)
+
+	fm := make(template.FuncMap)
+	fm["sectorName"] = func(s xt.Sector) []string {
+		return strings.Replace(s.Name(st.text), " ", "\n", -1)
 	}
+
+	st.tmpl = tmpls.Compile(fm)
 
 	//	http.HandleFunc("/ship/", st.ship)
 	//	http.HandleFunc("/ships", st.shiplist)
 	http.HandleFunc("/map", st.showMap)
 
-	fm := make(template.FuncMap)
-	fm["sectorName"] = func(s xt.Sector) string {
-		return s.Name(st.text)
-	}
-	st.tmpl = tmpls.Compile(fm)
-
 	log.Printf("now")
 	log.Fatal(http.ListenAndServe(":8080", nil))
-
-	/*
-		ship := flag.Arg(0)
-
-		s, _ := json.MarshalIndent(ships[ship], "", "\t")
-		fmt.Printf("%s", s)
-		s, _ = json.MarshalIndent(cockpits[ships[ship].TurretDescriptor[0].CIndex], "", "\t")
-		fmt.Printf("%s", s)
-
-		l := cockpits[ships[ship].TurretDescriptor[0].CIndex].LaserMask
-		for i := uint(0); i < 64; i++ {
-			if l&(1<<i) != 0 {
-				fmt.Println(lasers[i].Description)
-			}
-		}
-	*/
 }
 
 var _ = tmpls.Add("all", `
@@ -90,46 +65,3 @@ var _ = tmpls.Add("all", `
 </html>
 {{- end -}}
 `)
-
-var _ = tmpls.Add("shiplist", `
-{{template "header"}}
- <ul>
-{{- range .}}
-  <li><a href="/ship/{{.Description}}{{if .Variation}}/{{.Variation}}{{end}}">{{.Description}} {{.Variation}}</a>
-{{- end}}
- </ul>
-{{template "footer"}}
-`)
-
-func (st *state) shiplist(w http.ResponseWriter, req *http.Request) {
-	st.tmpl.ExecuteTemplate(w, "shiplist", st.ships)
-}
-
-var _ = tmpls.Add("ship", `
-{{template "header"}}
-  {{.Description}} {{.Variation}}<br/>
-  Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
-{{template "footer"}}
-`)
-
-func (st *state) ship(w http.ResponseWriter, req *http.Request) {
-	s := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/ship/"), "/", 2)
-	var name, variation string
-
-	switch len(s) {
-	case 1:
-		name = s[0]
-	case 2:
-		name = s[0]
-		variation = s[1]
-	}
-
-	for i := range st.ships {
-		if st.ships[i].Description == name && st.ships[i].Variation == variation {
-			st.tmpl.ExecuteTemplate(w, "ship", st.ships[i])
-			return
-		}
-	}
-
-	http.NotFound(w, req)
-}
