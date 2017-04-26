@@ -103,6 +103,9 @@ var _ = tmpls.Add("map", `
 				fill: yellow;
 				fill-opacity: 0.2;
 			}
+			.sectorname {
+				font-size: 1;
+			}
 		</style>
 		<g>
 {{- range .Sectors}}
@@ -115,8 +118,14 @@ var _ = tmpls.Add("map", `
 `)
 
 var _ = tmpls.Add("map-sector", `
-<text x="{{.X}}" y="{{.Y}}" font-size="1">{{sectorName .}}</text>
-<rect x="{{.X}}" y="{{.Y}}" class="s r{{.R}}" />
+<g transform="translate({{.X}} {{.Y}})">
+  <rect class="s r{{.R}}" />
+  <g transform="scale(0.12) translate(0.5 1)">
+{{- range $i, $row := (sectorName .)}}
+    <text transform="translate(0 {{$i}})" class="sectorname">{{$row}}</text>
+{{- end}}
+  </g>
+</g>
 `)
 
 func (st *state) showMap(w http.ResponseWriter, req *http.Request) {
