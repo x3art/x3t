@@ -120,7 +120,7 @@ var _ = tmpls.Add("map", `
 var _ = tmpls.Add("map-sector", `
 <g transform="translate({{.X}} {{.Y}})">
   <rect class="s r{{.R}}" />
-  <g transform="scale(0.12) translate(0.5 1)">
+  <g transform="scale(0.12) translate(0.5 1.3)">
 {{- range $i, $row := (sectorName .)}}
     <text transform="translate(0 {{$i}})" class="sectorname">{{$row}}</text>
 {{- end}}

@@ -41,8 +41,8 @@ func main() {
 		sp := strings.Split(s.Name(st.text), " ")
 		ret := make([]string, 0)
 		for _, e := range sp {
-			// If two substrings are shorter than 12, combine them
-			if len(ret) != 0 && len(ret[len(ret)-1])+len(e) < 12 {
+			// If two substrings are shorter than 11, combine them
+			if len(ret) != 0 && len(ret[len(ret)-1])+len(e) < 11 {
 				ret[len(ret)-1] = ret[len(ret)-1] + " " + e
 			} else {
 				ret = append(ret, e)
