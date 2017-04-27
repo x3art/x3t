@@ -113,7 +113,7 @@
 			}
 		</style>
 		<g>
-{{- range .Sectors}}
+{{- range .U.Sectors}}
 {{template "map-sector" .}}
 {{- end}}
 		</g>

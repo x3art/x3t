@@ -22,8 +22,12 @@ type state struct {
 	ships    []xt.Ship
 	cockpits []xt.Cockpit
 	lasers   []xt.Laser
-	u        xt.Universe
+	U        xt.Universe
 	tmpl     *template.Template
+}
+
+var rootTemplates = map[string]string{
+	"/map": "map",
 }
 
 func main() {
@@ -36,15 +40,31 @@ func main() {
 	// st.ships = xt.GetShips(*shipsFile, text)
 	// st.cockpits = xt.GetCockpits(*cockpitsFile, text)
 	// st.lasers = xt.GetLasers(*lasersFile, text)
-	st.u = xt.GetUniverse(*universeFile)
+	st.U = xt.GetUniverse(*universeFile)
 
 	fm := make(template.FuncMap)
 	st.mapFuncs(fm)
-	st.tmpl = tmpls.Compile(fm)
+
+	st.tmpl = template.New("")
+	st.tmpl.Funcs(fm)
+	if tmplDir, err := AssetDir("templates"); err == nil {
+		for _, tn := range tmplDir {
+			template.Must(st.tmpl.New(tn).Parse(string(MustAsset("templates/" + tn))))
+		}
+	}
+
+	for n, t := range rootTemplates {
+		http.HandleFunc(n, func(w http.ResponseWriter, req *http.Request) {
+			err := st.tmpl.ExecuteTemplate(w, t, st)
+			if err != nil {
+				log.Fatal(err)
+			}
+		})
+	}
 
 	//	http.HandleFunc("/ship/", st.ship)
 	//	http.HandleFunc("/ships", st.shiplist)
-	http.HandleFunc("/map", st.showMap)
+	// http.HandleFunc("/map", st.showMap)
 
 	if staticDir, err := AssetDir("static"); err == nil {
 		for _, n := range staticDir {
