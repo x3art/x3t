@@ -1,6 +1,9 @@
 package main
 
+//go:generate go-bindata -prefix assets assets/...
+
 import (
+	"bytes"
 	"flag"
 	"html/template"
 	"log"
@@ -44,7 +47,12 @@ func main() {
 	http.HandleFunc("/map", st.showMap)
 
 	http.HandleFunc("/js/svg-pan-zoom.min.js", func(w http.ResponseWriter, req *http.Request) {
-		http.ServeFile(w, req, "js/svg-pan-zoom.min.js")
+		fn := "/js/svg-pan-zoom.min.js"
+		ai, err := AssetInfo(fn)
+		if err != nil {
+			log.Fatal(err)
+		}
+		http.ServeContent(w, req, fn, ai.ModTime(), bytes.NewReader(MustAsset(fn)))
 	})
 
 	log.Printf("now")
