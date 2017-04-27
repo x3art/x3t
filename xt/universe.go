@@ -10,10 +10,10 @@ import (
 
 type Sector struct {
 	F      int `x3t:"o:f"`
-	X      int `x3t:"o:x"`
-	Y      int `x3t:"o:y"`
-	R      int `x3t:"o:r"`
-	Size   int `x3t:"o:size"`
+	X      int `x3t:"o:x"`    // map coordinates
+	Y      int `x3t:"o:y"`    // map coordinates
+	R      int `x3t:"o:r"`    // Race
+	Size   int `x3t:"o:size"` // Radius
 	M      int `x3t:"o:m"`
 	P      int `x3t:"o:p"`
 	Qtrade int `x3t:"o:qtrade"`
@@ -62,7 +62,7 @@ type rot struct {
 }
 
 type Asteroid struct {
-	Type   int `x3t:"o:atype"`
+	Type   int `x3t:"o:atype"` // 0 - ore, 1 - silicon, 2 - nividium, 3 - ice
 	Amount int `x3t:"o:aamount"`
 	S      int `x3t:"o:s"`
 	pos
