@@ -29,6 +29,7 @@ type state struct {
 var rootTemplates = map[string]string{
 	"/map":   "map",
 	"/ships": "ships",
+	"/about": "about",
 }
 
 func main() {
@@ -54,7 +55,8 @@ func main() {
 		}
 	}
 
-	for n, t := range rootTemplates {
+	for n := range rootTemplates {
+		t := rootTemplates[n]
 		http.HandleFunc(n, func(w http.ResponseWriter, req *http.Request) {
 			err := st.tmpl.ExecuteTemplate(w, t, st)
 			if err != nil {

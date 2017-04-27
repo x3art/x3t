@@ -1,0 +1,12 @@
+{{template "header"}}
+Parts of this software are from external sources.<br />
+<p>
+svg-pan-zoom.js is:
+<pre>
+{{template "LICENSE.svg-pan-zoom.js"}}
+</pre>
+</p>
+<p>
+Icons are from material.io, under an <a href="https://raw.githubusercontent.com/google/material-design-icons/master/LICENSE">Apache 2.0 license</a>.
+</p>
+{{template "footer"}}

@@ -7,6 +7,7 @@
 <body>
 {{- end -}}
 {{- define "footer" -}}
+<div><a href="/about">about</a></div>
 </body>
 </html>
 {{- end -}}
