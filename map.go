@@ -95,7 +95,10 @@ var _ = tmpls.Add("map", `
 			}
 			.zoomedsector {
 				transform: scale(3);
-				fill-opacity: 1.0;
+			}
+			.sectorhover {
+				fill-opacity: 0;
+				stroke-width: 0;
 			}
 		</style>
 		<g>
@@ -110,12 +113,14 @@ var _ = tmpls.Add("map", `
 <script>
 svgPanZoom("#themap")
 $(document).ready(function() {
-	$("g.sector").hover(
+	$(".sectorhover").hover(
 	  function() {
-	    this.parentElement.appendChild(this);
-	    $(this).find("g:first").addClass("zoomedsector");
+	    var t = this.parentElement;
+	    t.parentElement.appendChild(t);
+	    $(t).find("g:first").addClass("zoomedsector");
 	  }, function() {
-	    $(this).find("g:first").removeClass("zoomedsector");
+	    var t = this.parentElement;
+	    $(t).find("g:first").removeClass("zoomedsector");
   	});
 });
 </script>
@@ -133,6 +138,7 @@ var _ = tmpls.Add("map-sector", `
     <text transform="translate(0 3)" class="sectordesc">Suns: {{.SunPercent}}</text>
   </g>
  </g>
+ <rect class="s sectorhover" />
 </g>
 `)
 
