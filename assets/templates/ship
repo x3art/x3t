@@ -1,0 +1,4 @@
+{{template "header"}}
+  {{.Description}} {{.Variation}}<br/>
+  Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
+{{template "footer"}}

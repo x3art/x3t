@@ -19,7 +19,7 @@ var universeFile = flag.String("-universe", "data/x3_universe.xml", "universe fi
 
 type state struct {
 	text     xt.Text
-	ships    []xt.Ship
+	Ships    []xt.Ship
 	cockpits []xt.Cockpit
 	lasers   []xt.Laser
 	U        xt.Universe
@@ -27,7 +27,8 @@ type state struct {
 }
 
 var rootTemplates = map[string]string{
-	"/map": "map",
+	"/map":   "map",
+	"/ships": "ships",
 }
 
 func main() {
@@ -37,7 +38,7 @@ func main() {
 
 	st.text = xt.GetText(*textFile)
 
-	// st.ships = xt.GetShips(*shipsFile, text)
+	st.Ships = xt.GetShips(*shipsFile, st.text)
 	// st.cockpits = xt.GetCockpits(*cockpitsFile, text)
 	// st.lasers = xt.GetLasers(*lasersFile, text)
 	st.U = xt.GetUniverse(*universeFile)
@@ -62,9 +63,7 @@ func main() {
 		})
 	}
 
-	//	http.HandleFunc("/ship/", st.ship)
-	//	http.HandleFunc("/ships", st.shiplist)
-	// http.HandleFunc("/map", st.showMap)
+	http.HandleFunc("/ship/", st.ship)
 
 	if staticDir, err := AssetDir("static"); err == nil {
 		for _, n := range staticDir {

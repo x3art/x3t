@@ -1,0 +1,7 @@
+{{template "header"}}
+ <ul>
+{{- range .Ships}}
+  <li><a href="/ship/{{.Description}}{{if .Variation}}/{{.Variation}}{{end}}">{{.Description}} {{.Variation}}</a>
+{{- end}}
+ </ul>
+{{template "footer"}}
