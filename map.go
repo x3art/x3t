@@ -90,6 +90,9 @@ var _ = tmpls.Add("map", `
 			.sectorname {
 				font-size: 1;
 			}
+			.sectordesc {
+				font-size: 0.6;
+			}
 			.zoomedsector {
 				transform: scale(3);
 				fill-opacity: 1.0;
@@ -127,6 +130,7 @@ var _ = tmpls.Add("map-sector", `
 {{- range $i, $row := (sectorName .)}}
     <text transform="translate(0 {{$i}})" class="sectorname">{{$row}}</text>
 {{- end}}
+    <text transform="translate(0 3)" class="sectordesc">Suns: {{.SunPercent}}</text>
   </g>
  </g>
 </g>
