@@ -46,14 +46,18 @@ func main() {
 	//	http.HandleFunc("/ships", st.shiplist)
 	http.HandleFunc("/map", st.showMap)
 
-	http.HandleFunc("/js/svg-pan-zoom.min.js", func(w http.ResponseWriter, req *http.Request) {
-		fn := "/js/svg-pan-zoom.min.js"
-		ai, err := AssetInfo(fn)
-		if err != nil {
-			log.Fatal(err)
+	if staticDir, err := AssetDir("static"); err == nil {
+		for _, n := range staticDir {
+			fn := "static/" + n
+			http.HandleFunc("/"+fn, func(w http.ResponseWriter, req *http.Request) {
+				ai, err := AssetInfo(fn)
+				if err != nil {
+					log.Fatal(err)
+				}
+				http.ServeContent(w, req, fn, ai.ModTime(), bytes.NewReader(MustAsset(fn)))
+			})
 		}
-		http.ServeContent(w, req, fn, ai.ModTime(), bytes.NewReader(MustAsset(fn)))
-	})
+	}
 
 	log.Printf("now")
 	log.Fatal(http.ListenAndServe(":8080", nil))
