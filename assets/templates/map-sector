@@ -1,0 +1,14 @@
+<g transform="translate({{.X}} {{.Y}})" class="sector">
+ <g>
+  <rect class="s r{{.R}}" />
+  <g transform="scale(0.12) translate(0.5 1.3)">
+{{- range $i, $row := (sectorName .)}}
+    <text y="{{$i}}" class="sectorname">{{$row}}</text>
+{{- end}}
+{{- range $i, $icon := (sectorIcons .)}}
+    <use transform="translate({{$i}} 4) scale(0.04)" xlink:href="#{{$icon}}" />
+{{- end}}
+  </g>
+ </g>
+ <rect class="s sectorhover" />
+</g>

@@ -58,18 +58,3 @@ func main() {
 	log.Printf("now")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
-
-var _ = tmpls.Add("all", `
-{{- define "header" -}}
-<html>
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<title> foobar </title>
-</head>
-<body>
-{{- end -}}
-{{- define "footer" -}}
-</body>
-</html>
-{{- end -}}
-`)
