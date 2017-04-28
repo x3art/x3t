@@ -16,7 +16,7 @@ import (
 
 // Access files according to the rules as I understand them.
 // cat/dat files in number order, then actual directories.
-// later overriding the earlier.
+// Latter overriding the earlier.
 
 type xdata interface {
 	Open() io.ReadCloser
@@ -50,7 +50,7 @@ var pckMap = map[string]string{
 	"types": "txt",
 }
 
-// the capture groups are:
+// The regex capture groups are:
 // 0 - all of it
 // 1 - directory path
 // 2 - path without last directory (unused)
@@ -71,12 +71,12 @@ func (xf *Xfiles) parseCD(basename string) bool {
 		log.Fatalf("cat(%s) without dat: %v", basename, err)
 	}
 
-	// We deliberately leak the dat file descriptor.  There won't
+	// We deliberately leak the dat file descriptors. There won't
 	// be that many of them, so it's not worth the effort to
 	// figure out the logic of when they should be opened and
 	// closed.
 
-	s := bufio.NewScanner(&catDescrambler{r: fc})
+	s := bufio.NewScanner(&stupidDescrambler{r: fc, cookie: 219, addOff: true})
 	s.Scan() // throw away the first line
 	off := int64(0)
 	for s.Scan() {
@@ -109,17 +109,25 @@ func (xf *Xfiles) parseCD(basename string) bool {
 	return true
 }
 
-// io.Reader wrapper to descramble cat files.
-type catDescrambler struct {
-	r   io.Reader
-	off int
+// io.Reader wrapper to descramble various data.
+type stupidDescrambler struct {
+	r      io.Reader
+	off    int
+	cookie byte
+	addOff bool
 }
 
-func (d *catDescrambler) Read(p []byte) (int, error) {
+func (d *stupidDescrambler) Read(p []byte) (int, error) {
 	n, err := d.r.Read(p)
 	if err == nil {
-		for i := 0; i < n; i++ {
-			p[i] ^= byte(219 + d.off + i)
+		if d.addOff {
+			for i := 0; i < n; i++ {
+				p[i] ^= d.cookie + byte(d.off+i)
+			}
+		} else {
+			for i := 0; i < n; i++ {
+				p[i] ^= d.cookie
+			}
 		}
 		d.off += n
 	}
@@ -146,28 +154,11 @@ func (c cd) Open() io.ReadCloser {
 	var r io.Reader
 	r = io.NewSectionReader(c.f, c.off, c.n)
 	if c.pck {
-		zr, err := gzip.NewReader(&pckDescrambler{r: r})
+		zr, err := gzip.NewReader(&stupidDescrambler{r: r, cookie: 51})
 		if err != nil {
 			log.Fatal(err)
 		}
 		r = zr
 	}
 	return ioutil.NopCloser(r)
-}
-
-// io.Reader wrapper to descramble cat files.
-//
-// What's the point of this?
-type pckDescrambler struct {
-	r io.Reader
-}
-
-func (d *pckDescrambler) Read(p []byte) (int, error) {
-	n, err := d.r.Read(p)
-	if err == nil {
-		for i := 0; i < n; i++ {
-			p[i] ^= 51
-		}
-	}
-	return n, err
 }
