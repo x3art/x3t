@@ -5,7 +5,9 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"x3t/xt"
@@ -34,6 +36,13 @@ var rootTemplates = map[string]string{
 
 func main() {
 	flag.Parse()
+
+	xf := xt.XFiles(flag.Arg(0))
+
+	f := xf.Open("addon/types/TWareN.txt")
+	a, _ := ioutil.ReadAll(f)
+	fmt.Printf("%s\n", a)
+	return
 
 	st := state{}
 
