@@ -2,14 +2,16 @@ package xt
 
 import (
 	"bufio"
-	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 // Access files according to the rules as I understand them.
@@ -28,9 +30,35 @@ func XFiles(dir string) Xfiles {
 	ret := Xfiles{f: make(map[string]map[string]xdata)}
 	for i := 1; ret.parseCD(filepath.Join(dir, fmt.Sprintf("%.2d", i))); i++ {
 	}
-	fmt.Print(ret)
 	return ret
 }
+
+func (xf *Xfiles) Open(fname string) io.ReadCloser {
+	a := strings.LastIndex(fname, "/")
+	if dir := xf.f[fname[:a]]; dir == nil {
+		return nil
+	} else if f := dir[fname[a+1:]]; f == nil {
+		return nil
+	} else {
+		return f.Open()
+	}
+
+}
+
+// If a file has the suffix .pck in a certain directory, what suffix should it have?
+var pckMap = map[string]string{
+	"types": "txt",
+}
+
+// the capture groups are:
+// 0 - all of it
+// 1 - directory path
+// 2 - path without last directory (unused)
+// 3 - last directory in the path
+// 4 - file name without suffix
+// 5 - suffix
+// 6 - size
+var pathRe = regexp.MustCompile(`((.+/)*(.+))/(.+)\.(.+) ([0-9]+)`)
 
 func (xf *Xfiles) parseCD(basename string) bool {
 	fc, err := os.Open(basename + ".cat")
@@ -43,8 +71,6 @@ func (xf *Xfiles) parseCD(basename string) bool {
 		log.Fatalf("cat(%s) without dat: %v", basename, err)
 	}
 
-	_ = fd
-
 	// We deliberately leak the dat file descriptor.  There won't
 	// be that many of them, so it's not worth the effort to
 	// figure out the logic of when they should be opened and
@@ -54,23 +80,30 @@ func (xf *Xfiles) parseCD(basename string) bool {
 	s.Scan() // throw away the first line
 	off := int64(0)
 	for s.Scan() {
-		split := bytes.Split(s.Bytes(), []byte{' '})
-		if len(split) != 2 {
-			log.Fatal("I guess the format is more complex than this")
+		split := pathRe.FindStringSubmatch(s.Text())
+		if len(split) != 7 {
+			log.Printf("can't parse .cat line: '%s'", s.Text())
+			continue
 		}
-		i, err := strconv.ParseInt(string(split[1]), 10, 64)
+		i, err := strconv.ParseInt(string(split[6]), 10, 64)
 		if err != nil {
 			log.Fatal(err)
 		}
-		// we probably need to do some path mangling here
-		// Also, how to deal with certain files being .pck without knowing their actual suffix?
-		// Do we need a function that maps the directory to the actual file name?
-		p := filepath.FromSlash(string(split[0]))
-		d, b := filepath.Dir(p), filepath.Base(p)
+		d := split[1]
 		if xf.f[d] == nil {
 			xf.f[d] = make(map[string]xdata)
 		}
-		xf.f[d][b] = cd{fd, off, off + i}
+		suffix := split[5]
+		packed := false
+		if suffix == "pck" {
+			packed = true
+			if pm := pckMap[split[3]]; pm == "" {
+				log.Printf("Path '%s' has a .pck file without mapping", split[0])
+			} else {
+				suffix = pm
+			}
+		}
+		xf.f[split[1]][split[4]+"."+suffix] = cd{fd, off, off + i, packed}
 		off += i
 	}
 	return true
@@ -90,7 +123,7 @@ func (d *catDescrambler) Read(p []byte) (int, error) {
 		}
 		d.off += n
 	}
-	return n, nil
+	return n, err
 }
 
 type fs string
@@ -106,8 +139,35 @@ func (fn fs) Open() io.ReadCloser {
 type cd struct {
 	f      io.ReaderAt
 	off, n int64
+	pck    bool
 }
 
 func (c cd) Open() io.ReadCloser {
-	return ioutil.NopCloser(io.NewSectionReader(c.f, c.off, c.n))
+	var r io.Reader
+	r = io.NewSectionReader(c.f, c.off, c.n)
+	if c.pck {
+		zr, err := gzip.NewReader(&pckDescrambler{r: r})
+		if err != nil {
+			log.Fatal(err)
+		}
+		r = zr
+	}
+	return ioutil.NopCloser(r)
+}
+
+// io.Reader wrapper to descramble cat files.
+//
+// What's the point of this?
+type pckDescrambler struct {
+	r io.Reader
+}
+
+func (d *pckDescrambler) Read(p []byte) (int, error) {
+	n, err := d.r.Read(p)
+	if err == nil {
+		for i := 0; i < n; i++ {
+			p[i] ^= 51
+		}
+	}
+	return n, err
 }
