@@ -28,6 +28,7 @@ type Xfiles struct {
 
 func XFiles(dir string) Xfiles {
 	ret := Xfiles{f: make(map[string]map[string]xdata)}
+	// 01, 02, 03, etc. stop at the first that doesn't exist.
 	for i := 1; ret.parseCD(filepath.Join(dir, fmt.Sprintf("%.2d", i))); i++ {
 	}
 	return ret
