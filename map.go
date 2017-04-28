@@ -2,6 +2,7 @@ package main
 
 import (
 	"html/template"
+	"log"
 	"strings"
 	"x3t/xt"
 )
@@ -43,5 +44,17 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 			ret = append(ret, "dock")
 		}
 		return ret
+	}
+	fm["validGate"] = func(g xt.Gate) bool {
+		if g.S == 4 {
+			return false
+		}
+		switch g.Gid {
+		case 0, 1, 2, 3:
+			return true
+		default:
+			log.Print("unknown gatepos ", g)
+			return false
+		}
 	}
 }

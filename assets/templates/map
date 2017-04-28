@@ -111,6 +111,27 @@
 				fill-opacity: 0;
 				stroke-width: 0;
 			}
+			.gate {
+				fill: black;
+				width:0.1;
+				height:0.1;
+			}
+			.gatepos0 {
+				x:0.45;
+				y:-0.05;
+			}
+			.gatepos1 {
+				x:0.45;
+				y:0.75;
+			}
+			.gatepos2 {
+				x:-0.05;
+				y:0.45;
+			}
+			.gatepos3 {
+				x:0.75;
+				y:0.45;
+			}
 		</style>
 		<g>
 {{- range .U.Sectors}}

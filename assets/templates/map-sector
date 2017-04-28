@@ -9,6 +9,9 @@
     <use transform="translate({{$i}} 4) scale(0.04)" xlink:href="#{{$icon}}" />
 {{- end}}
   </g>
+{{- range .Gates}}
+  {{if validGate .}}<rect class="gate gatepos{{.Gid}}" />{{end}}
+{{- end}}
  </g>
  <rect class="s sectorhover" />
 </g>

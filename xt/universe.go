@@ -121,9 +121,13 @@ type Factory struct {
 
 type Gate struct {
 	id
-	Gid int `x3t:"o:gid"`
+	Gid int `x3t:"o:gid"` // 0,1,2,3 - N,S,W,E
 	pos
 	rot
+	// 0, 1, 2, 3 - normal gate N, S, W, E
+	// 4 - destroyed
+	// 5, 6, 7, 8 - Trans-orbital accelerator N, S, W, E
+	// 9 - 20 - xenon hub gates
 	S    int `x3t:"o:s"`
 	Gx   int `x3t:"o:gx"`
 	Gy   int `x3t:"o:gy"`
