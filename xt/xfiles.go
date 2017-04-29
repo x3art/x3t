@@ -46,6 +46,14 @@ func (xf *Xfiles) Open(fname string) io.ReadCloser {
 
 }
 
+func (xf *Xfiles) Map(f func(string, string)) {
+	for dir := range xf.f {
+		for fn := range xf.f[dir] {
+			f(dir, fn)
+		}
+	}
+}
+
 // If a file has the suffix .pck in a certain directory, what suffix should it have?
 var pckMap = map[string]string{
 	"types": "txt",
