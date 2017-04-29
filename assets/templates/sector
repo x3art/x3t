@@ -1,4 +1,14 @@
 {{template "header"}}
   Sector: {{sectName .S}}<br />
   Race: {{raceName .S.R}}<br />
+  Suns: {{.S.SunPercent}}<br />
+  <ul>Gates:
+   {{$u := .St.U}}
+   {{- range .S.Gates}}
+    {{- $conn := ($u.SectorXY .Gx .Gy)}}
+    {{- if $conn}}
+     <li> {{printf "%c" (index "NSWE" .Gid)}} - <a href="/sector/{{.Gx}}/{{.Gy}}">{{sectName $conn}}</a>
+    {{- end}}
+   {{- end}}
+  </ul>
 {{template "footer"}}
