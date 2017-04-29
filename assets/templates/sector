@@ -1,0 +1,4 @@
+{{template "header"}}
+  Sector: {{sectName .S}}<br />
+  Race: {{raceName .S.R}}<br />
+{{template "footer"}}

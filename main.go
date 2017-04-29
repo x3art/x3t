@@ -5,9 +5,7 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"x3t/xt"
@@ -37,13 +35,14 @@ var rootTemplates = map[string]string{
 func main() {
 	flag.Parse()
 
-	xf := xt.XFiles(flag.Arg(0))
+	/*
+		xf := xt.XFiles(flag.Arg(0))
 
-	f := xf.Open("addon/types/TWareN.txt")
-	a, _ := ioutil.ReadAll(f)
-	fmt.Printf("%s\n", a)
-	return
-
+		f := xf.Open("addon/types/TWareN.txt")
+		a, _ := ioutil.ReadAll(f)
+		fmt.Printf("%s\n", a)
+		return
+	*/
 	st := state{}
 
 	st.text = xt.GetText(*textFile)
@@ -75,6 +74,7 @@ func main() {
 	}
 
 	http.HandleFunc("/ship/", st.ship)
+	http.HandleFunc("/sector/", st.sector)
 
 	if staticDir, err := AssetDir("static"); err == nil {
 		for _, n := range staticDir {
