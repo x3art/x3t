@@ -334,3 +334,13 @@ func GetUniverse(n string) (u Universe) {
 
 	return u
 }
+
+func (u Universe) SectorXY(x, y int) *Sector {
+	// There's only a few hundred of them, no point in making this more efficient (for now).
+	for i := range u.Sectors {
+		if u.Sectors[i].X == x && u.Sectors[i].Y == y {
+			return &u.Sectors[i]
+		}
+	}
+	return nil
+}
