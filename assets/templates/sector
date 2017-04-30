@@ -2,13 +2,20 @@
   Sector: {{sectName .S}}<br />
   Race: {{raceName .S.R}}<br />
   Suns: {{.S.SunPercent}}<br />
+  {{- $st := .St}}
   <ul>Gates:
-   {{$u := .St.U}}
    {{- range .S.Gates}}
-    {{- $conn := ($u.SectorXY .Gx .Gy)}}
-    {{- if $conn}}
-     <li> {{printf "%c" (index "NSWE" .Gid)}} - <a href="/sector/{{.Gx}}/{{.Gy}}">{{sectName $conn}}</a>
+    {{- $dir := (index "NSWE" .Gid)}}
+    {{- with ($st.U.SectorXY .Gx .Gy)}}
+     <li> {{printf "%c" $dir}} - <a href="/sector/{{.X}}/{{.Y}}">{{sectName .}}</a>
     {{- end}}
    {{- end}}
   </ul>
+  {{- with .S.Docks}}
+   <ul>Docks:
+    {{- range .}}
+     <li> {{ (index $st.Docks .S).Description }}
+    {{- end}}
+   </ul>
+  {{- end}}
 {{template "footer"}}
