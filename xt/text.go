@@ -81,20 +81,24 @@ func (t Text) Get(pid, tid int) (string, error) {
 		return fmt.Sprintf("bad string %d,%d", pid, tid), nil
 	}
 	s := t[pid][tid]
-	if m := reCurly.FindStringSubmatch(s); len(m) > 0 {
-		pid, err := strconv.Atoi(m[1])
-		if err != nil {
-			return "", fmt.Errorf("Bad page id: %v", m[1])
+	for {
+		if m := reCurly.FindStringSubmatch(s); len(m) > 0 {
+			pid, err := strconv.Atoi(m[1])
+			if err != nil {
+				return "", fmt.Errorf("Bad page id: %v", m[1])
+			}
+			tid, err := strconv.Atoi(m[2])
+			if err != nil {
+				return "", fmt.Errorf("Bad text id: %v", m[2])
+			}
+			repl, err := t.Get(pid, tid)
+			if err != nil {
+				return "", err
+			}
+			s = strings.Replace(s, m[0], repl, -1)
+		} else {
+			break
 		}
-		tid, err := strconv.Atoi(m[2])
-		if err != nil {
-			return "", fmt.Errorf("Bad text id: %v", m[2])
-		}
-		repl, err := t.Get(pid, tid)
-		if err != nil {
-			return "", err
-		}
-		s = reCurly.ReplaceAllString(s, repl)
 	}
 	return strings.TrimSpace(reParen.ReplaceAllString(s, "")), nil
 }
