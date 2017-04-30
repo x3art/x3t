@@ -18,19 +18,31 @@ import (
 // cat/dat files in number order, then actual directories.
 // Latter overriding the earlier.
 
-type xdata interface {
+type Xdata interface {
 	Open() io.ReadCloser
 }
 
 type Xfiles struct {
-	f map[string]map[string]xdata // [directory][file]
+	f map[string]map[string]Xdata // [directory][file]
 }
 
 func XFiles(dir string) Xfiles {
-	ret := Xfiles{f: make(map[string]map[string]xdata)}
+	ret := Xfiles{f: make(map[string]map[string]Xdata)}
 	// 01, 02, 03, etc. stop at the first that doesn't exist.
-	for i := 1; ret.parseCD(filepath.Join(dir, fmt.Sprintf("%.2d", i))); i++ {
+	for i := 1; ret.parseCD(filepath.Join(dir, "addon", fmt.Sprintf("%.2d", i))); i++ {
 	}
+	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+
+		relpath, err := filepath.Rel(dir, path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		ret.add(relpath, fs(path))
+		return nil
+	})
 	return ret
 }
 
@@ -59,15 +71,27 @@ var pckMap = map[string]string{
 	"types": "txt",
 }
 
-// The regex capture groups are:
-// 0 - all of it
-// 1 - directory path
-// 2 - path without last directory (unused)
-// 3 - last directory in the path
-// 4 - file name without suffix
-// 5 - suffix
-// 6 - size
-var pathRe = regexp.MustCompile(`((.+/)*(.+))/(.+)\.(.+) ([0-9]+)`)
+var pathRe = regexp.MustCompile(`(.+) ([0-9]+)`)
+
+// Must be called with native paths, we'll convert back to slashes.
+func (xf *Xfiles) add(fn string, xd Xdata) {
+	d, f := filepath.Split(fn)
+	if filepath.Ext(f) == ".pck" {
+		base := filepath.Base(d)
+		if pm := pckMap[base]; pm == "" {
+			log.Printf("Path '%s' has a .pck file without mapping", fn)
+		} else {
+			f = strings.TrimSuffix(f, "pck") + pm
+		}
+		xd = pck{xd}
+	}
+	d = strings.TrimSuffix(filepath.ToSlash(d), "/")
+	if xf.f[d] == nil {
+		xf.f[d] = make(map[string]Xdata)
+	}
+	xf.f[d][f] = xd
+
+}
 
 func (xf *Xfiles) parseCD(basename string) bool {
 	fc, err := os.Open(basename + ".cat")
@@ -90,29 +114,15 @@ func (xf *Xfiles) parseCD(basename string) bool {
 	off := int64(0)
 	for s.Scan() {
 		split := pathRe.FindStringSubmatch(s.Text())
-		if len(split) != 7 {
-			log.Printf("can't parse .cat line: '%s'", s.Text())
+		if len(split) != 3 {
+			log.Printf("can't parse .cat line: '%s' (%v)", s.Text(), split)
 			continue
 		}
-		i, err := strconv.ParseInt(string(split[6]), 10, 64)
+		i, err := strconv.ParseInt(string(split[2]), 10, 64)
 		if err != nil {
 			log.Fatal(err)
 		}
-		d := split[1]
-		if xf.f[d] == nil {
-			xf.f[d] = make(map[string]xdata)
-		}
-		suffix := split[5]
-		packed := false
-		if suffix == "pck" {
-			packed = true
-			if pm := pckMap[split[3]]; pm == "" {
-				log.Printf("Path '%s' has a .pck file without mapping", split[0])
-			} else {
-				suffix = pm
-			}
-		}
-		xf.f[split[1]][split[4]+"."+suffix] = cd{fd, off, off + i, packed}
+		xf.add(filepath.FromSlash(split[1]), cd{fd, off, off + i})
 		off += i
 	}
 	return true
@@ -156,18 +166,35 @@ func (fn fs) Open() io.ReadCloser {
 type cd struct {
 	f      io.ReaderAt
 	off, n int64
-	pck    bool
 }
 
 func (c cd) Open() io.ReadCloser {
-	var r io.Reader
-	r = io.NewSectionReader(c.f, c.off, c.n)
-	if c.pck {
-		zr, err := gzip.NewReader(&stupidDescrambler{r: r, cookie: 51})
-		if err != nil {
-			log.Fatal(err)
-		}
-		r = zr
+	return ioutil.NopCloser(io.NewSectionReader(c.f, c.off, c.n))
+}
+
+type pck struct {
+	xd Xdata
+}
+
+type pckReader struct {
+	zr *gzip.Reader
+	r  io.ReadCloser
+}
+
+func (p pck) Open() io.ReadCloser {
+	r := p.xd.Open()
+	zr, err := gzip.NewReader(&stupidDescrambler{r: r, cookie: 51})
+	if err != nil {
+		log.Fatal(err)
 	}
-	return ioutil.NopCloser(r)
+	return &pckReader{zr, r}
+}
+
+func (pr *pckReader) Read(p []byte) (int, error) {
+	return pr.zr.Read(p)
+}
+
+func (pr *pckReader) Close() error {
+	pr.zr.Close()
+	return pr.r.Close()
 }
