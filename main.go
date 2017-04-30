@@ -11,7 +11,6 @@ import (
 	"x3t/xt"
 )
 
-var textFile = flag.String("-strings", "data/0001-L044.xml", "strings file")
 var shipsFile = flag.String("-ships", "data/TShips.txt", "ships file")
 var cockpitsFile = flag.String("-cockpits", "data/TCockpits.txt", "cockpits file")
 var lasersFile = flag.String("-lasers", "data/TLaser.txt", "lasers file")
@@ -35,17 +34,11 @@ var rootTemplates = map[string]string{
 func main() {
 	flag.Parse()
 
-	/*
-		xf := xt.XFiles(flag.Arg(0))
+	xf := xt.XFiles(flag.Arg(0))
 
-		f := xf.Open("addon/types/TWareN.txt")
-		a, _ := ioutil.ReadAll(f)
-		fmt.Printf("%s\n", a)
-		return
-	*/
 	st := state{}
 
-	st.text = xt.GetText(*textFile)
+	st.text = xt.GetText(xf)
 
 	st.Ships = xt.GetShips(*shipsFile, st.text)
 	// st.cockpits = xt.GetCockpits(*cockpitsFile, text)

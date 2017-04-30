@@ -4,7 +4,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"log"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,39 +28,43 @@ type TextFile struct {
 
 type Text map[int]map[int]string
 
-func GetText(n string) Text {
-	f, err := os.Open(n)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-	d := xml.NewDecoder(f)
-	t := TextFile{}
-	d.Decode(&t)
-
+func GetText(xf Xfiles) Text {
 	ret := make(Text)
-	merge := func(min, max int) {
-		for pi := range t.Pages {
-			px := &t.Pages[pi]
-			pid := px.Id
-			if pid >= max || pid < min {
-				continue
-			}
-			pid -= min
-			if _, ok := ret[pid]; !ok {
-				ret[pid] = make(map[int]string, len(px.T))
-			}
-			for ti := range px.T {
-				tx := &px.T[ti]
-				ret[pid][tx.Id] = tx.Value
-			}
-		}
 
+	for fn := range xf.f["addon/t"] {
+		// Just english for now.
+		if !strings.HasSuffix(fn, "L044.xml") {
+			continue
+		}
+		f := xf.Open("addon/t/" + fn)
+		defer f.Close()
+		d := xml.NewDecoder(f)
+		t := TextFile{}
+		d.Decode(&t)
+
+		merge := func(min, max int) {
+			for pi := range t.Pages {
+				px := &t.Pages[pi]
+				pid := px.Id
+				if pid >= max || pid < min {
+					continue
+				}
+				pid -= min
+				if _, ok := ret[pid]; !ok {
+					ret[pid] = make(map[int]string, len(px.T))
+				}
+				for ti := range px.T {
+					tx := &px.T[ti]
+					ret[pid][tx.Id] = tx.Value
+				}
+			}
+
+		}
+		merge(0, 300000)
+		merge(300000, 350000)
+		merge(350000, 380000)
+		merge(380000, 600000)
 	}
-	merge(0, 300000)
-	merge(300000, 350000)
-	merge(350000, 380000)
-	merge(380000, 600000)
 	return ret
 }
 
