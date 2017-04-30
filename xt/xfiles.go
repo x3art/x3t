@@ -138,7 +138,7 @@ func (xf *Xfiles) parseCD(basename string) bool {
 
 // io.Reader wrapper to descramble various data.
 type stupidDescrambler struct {
-	r      io.Reader
+	r      io.ReadCloser
 	off    int
 	cookie byte
 	addOff bool
@@ -159,6 +159,10 @@ func (d *stupidDescrambler) Read(p []byte) (int, error) {
 		d.off += n
 	}
 	return n, err
+}
+
+func (d *stupidDescrambler) Close() error {
+	return d.r.Close()
 }
 
 type fs string
@@ -190,8 +194,8 @@ type pckReader struct {
 }
 
 func (p pck) Open() io.ReadCloser {
-	r := p.xd.Open()
-	zr, err := gzip.NewReader(&stupidDescrambler{r: r, cookie: 51})
+	r := &stupidDescrambler{r: p.xd.Open(), cookie: 51}
+	zr, err := gzip.NewReader(r)
 	if err != nil {
 		log.Fatal(err)
 	}
