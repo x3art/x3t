@@ -68,7 +68,15 @@ func (xf *Xfiles) Map(f func(string, string)) {
 
 // If a file has the suffix .pck in a certain directory, what suffix should it have?
 var pckMap = map[string]string{
-	"types": "txt",
+	"types":    "txt",
+	"t":        "xml",
+	"scripts":  "xml",
+	"maps":     "xml",
+	"director": "xml",
+	// XXX - no idea about the directories below, just shut up the warning for now.
+	"dds":       "wtf",
+	"v":         "wtf",
+	"cutscenes": "wtf",
 }
 
 var pathRe = regexp.MustCompile(`(.+) ([0-9]+)`)
