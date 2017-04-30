@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -177,13 +176,26 @@ func (fn fs) Open() io.ReadCloser {
 	return f
 }
 
+type readerWithAt interface {
+	io.Reader
+	io.ReaderAt
+}
+
+type nopclose struct {
+	readerWithAt
+}
+
+func (_ nopclose) Close() error {
+	return nil
+}
+
 type cd struct {
 	f      io.ReaderAt
 	off, n int64
 }
 
 func (c cd) Open() io.ReadCloser {
-	return ioutil.NopCloser(io.NewSectionReader(c.f, c.off, c.n))
+	return nopclose{io.NewSectionReader(c.f, c.off, c.n)}
 }
 
 type pck struct {
