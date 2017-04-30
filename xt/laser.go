@@ -1,44 +1,9 @@
 package xt
 
-import (
-	"encoding/csv"
-	"log"
-	"os"
-)
-
 func GetLasers(n string, text Text) []Laser {
-	f, err := os.Open(n)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// It's not really a csv file, but this works, so why not.
-	r := csv.NewReader(f)
-	r.Comment = '/'
-	r.Comma = ';'
-
-	rec, err := r.Read()
-	if err != nil {
-		log.Fatal(err)
-	}
-	inf := struct {
-		Ver  int
-		Nrec int
-	}{}
-	t := tParser{rec: rec, t: text}
-	t.parseAll(&inf)
-
-	lasers := make([]Laser, inf.Nrec)
-	for i := 0; i < inf.Nrec; i++ {
-		r.FieldsPerRecord = 0
-		rec, err := r.Read()
-		if err != nil {
-			log.Fatal(err)
-		}
-		t := tParser{rec: rec, t: text}
-		t.parseAll(&lasers[i])
-	}
-	return lasers
+	ret := []Laser{}
+	tparse(n, text, &ret)
+	return ret
 }
 
 type Laser struct {

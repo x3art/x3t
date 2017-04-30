@@ -1,44 +1,9 @@
 package xt
 
-import (
-	"encoding/csv"
-	"log"
-	"os"
-)
-
 func GetShips(n string, text Text) []Ship {
-	f, err := os.Open(n)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// It's not really a csv file, but this works, so why not.
-	r := csv.NewReader(f)
-	r.Comment = '/'
-	r.Comma = ';'
-
-	rec, err := r.Read()
-	if err != nil {
-		log.Fatal(err)
-	}
-	inf := struct {
-		Ver  int
-		Nrec int
-	}{}
-	t := tParser{rec: rec, t: text}
-	t.parseAll(&inf)
-
-	ships := make([]Ship, inf.Nrec)
-	for i := 0; i < inf.Nrec; i++ {
-		r.FieldsPerRecord = 0
-		rec, err := r.Read()
-		if err != nil {
-			log.Fatal(err)
-		}
-		t := tParser{rec: rec, t: text}
-		t.parseAll(&ships[i])
-	}
-	return ships
+	ret := []Ship{}
+	tparse(n, text, &ret)
+	return ret
 }
 
 type Ship struct {

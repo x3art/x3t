@@ -1,8 +1,10 @@
 package xt
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -12,6 +14,51 @@ type tParser struct {
 	rec     []string
 	lastTag string
 	t       Text
+}
+
+func tparse(n string, text Text, slicei interface{}) {
+	slicev := reflect.Indirect(reflect.ValueOf(slicei))
+
+	f, err := os.Open(n)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// It's not really a csv file, but this works, so why not.
+	r := csv.NewReader(f)
+	r.Comment = '/'
+	r.Comma = ';'
+
+	rec, err := r.Read()
+	if err != nil {
+		log.Fatal(err)
+	}
+	inf := struct {
+		Ver  int
+		Nrec int
+	}{}
+	t := tParser{rec: rec, t: text}
+	t.parseAll(&inf)
+
+	slicev.Set(reflect.MakeSlice(slicev.Type(), inf.Nrec, inf.Nrec))
+	for i := 0; i < inf.Nrec; i++ {
+		r.FieldsPerRecord = 0
+		rec, err := r.Read()
+		if err != nil {
+			log.Fatal(err)
+		}
+		t := tParser{rec: rec, t: text}
+		err = t.pvalue(slicev.Index(i))
+		if err != nil {
+			log.Fatal(err)
+		}
+		if len(t.rec) == 1 && t.rec[0] == "" {
+			t.rec = t.rec[1:]
+		}
+		if len(t.rec) != 0 {
+			log.Fatalf("record not fully consumed: %v %v", t.rec, len(t.rec))
+		}
+	}
 }
 
 func (t *tParser) parseAll(data interface{}) {
