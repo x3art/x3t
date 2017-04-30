@@ -13,5 +13,5 @@
   {{if validGate .}}<rect class="gate gatepos{{.Gid}}" />{{end}}
 {{- end}}
  </g>
- <rect class="s sectorhover" />
+ <a href="/sector/{{.X}}/{{.Y}}"><rect class="s sectorhover" /></a>
 </g>
