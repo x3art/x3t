@@ -28,9 +28,11 @@ type Xfiles struct {
 
 func XFiles(dir string) Xfiles {
 	ret := Xfiles{f: make(map[string]map[string]Xdata)}
-	// 01, 02, 03, etc. stop at the first that doesn't exist.
+	// 01.{cat,dat}, 02.{cat,dat}, etc. stop at the first that doesn't exist.
+	// XXX - how are the non-addon directory cat files involved here?
 	for i := 1; ret.parseCD(filepath.Join(dir, "addon", fmt.Sprintf("%.2d", i))); i++ {
 	}
+	// Now, the normal files.
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
@@ -79,8 +81,6 @@ var pckMap = map[string]string{
 	"cutscenes": "wtf",
 }
 
-var pathRe = regexp.MustCompile(`(.+) ([0-9]+)`)
-
 // Must be called with native paths, we'll convert back to slashes.
 func (xf *Xfiles) add(fn string, xd Xdata) {
 	d, f := filepath.Split(fn)
@@ -100,6 +100,8 @@ func (xf *Xfiles) add(fn string, xd Xdata) {
 	xf.f[d][f] = xd
 
 }
+
+var pathRe = regexp.MustCompile(`(.+) ([0-9]+)`)
 
 func (xf *Xfiles) parseCD(basename string) bool {
 	fc, err := os.Open(basename + ".cat")
@@ -197,7 +199,7 @@ func (p pck) Open() io.ReadCloser {
 	r := p.xd.Open()
 	ra := r.(io.ReaderAt)
 	// 31, 139
-	hdr := make([]byte, 3, 3)
+	hdr := make([]byte, 4, 4)
 	_, err := ra.ReadAt(hdr, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -206,20 +208,26 @@ func (p pck) Open() io.ReadCloser {
 	// Figure out the stupid scrambling.
 	//
 	// What we're looking for is the first two bytes of a gzip
-	// header.  31 and 139. This has the potential of giving false
-	// positives. It is in fact trivial to generate a header that
-	// will break this and no matter which comparison is done
-	// first, it will be the wrong one.
+	// header - 31, 139 (and 8 because we expect deflate).
+	//
+	// This code has the potential of giving false positives. It
+	// is in fact trivial to generate a header that will break
+	// this and no matter which comparison is done first, it will
+	// be the wrong one. This seems to work for now.
 	rs := &stupidDescrambler{r: r}
-	if cookie := (hdr[0] ^ 31); cookie^hdr[1] == 139 {
+	if cookie := (hdr[0] ^ 31); hdr[1]^cookie == 139 && hdr[2]^cookie == 8 {
 		// the first two bytes are a gzip header xor cookie.
 		rs.cookie = cookie
-	} else if cookie := (hdr[1] ^ 31); cookie^hdr[2] == 139 {
+	} else if cookie := (hdr[1] ^ 31); hdr[2]^cookie == 139 && hdr[3]^cookie == 8 {
 		// apparently the cookie can be in the first byte and it's xor something.
-		// it's easier to just ignore it.
+		// it's easier to just ignore it and just figure it out from the header.
+
+		// eat first byte
 		tmp := make([]byte, 1, 1)
 		_, _ = r.Read(tmp)
 		rs.cookie = cookie
+	} else {
+		log.Printf("unknown scrambling method. fingers crossed.")
 	}
 
 	zr, err := gzip.NewReader(rs)
