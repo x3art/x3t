@@ -194,10 +194,37 @@ type pckReader struct {
 }
 
 func (p pck) Open() io.ReadCloser {
-	r := &stupidDescrambler{r: p.xd.Open(), cookie: 51}
-	zr, err := gzip.NewReader(r)
+	r := p.xd.Open()
+	ra := r.(io.ReaderAt)
+	// 31, 139
+	hdr := make([]byte, 3, 3)
+	_, err := ra.ReadAt(hdr, 0)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// Figure out the stupid scrambling.
+	//
+	// What we're looking for is the first two bytes of a gzip
+	// header.  31 and 139. This has the potential of giving false
+	// positives. It is in fact trivial to generate a header that
+	// will break this and no matter which comparison is done
+	// first, it will be the wrong one.
+	rs := &stupidDescrambler{r: r}
+	if cookie := (hdr[0] ^ 31); cookie^hdr[1] == 139 {
+		// the first two bytes are a gzip header xor cookie.
+		rs.cookie = cookie
+	} else if cookie := (hdr[1] ^ 31); cookie^hdr[2] == 139 {
+		// apparently the cookie can be in the first byte and it's xor something.
+		// it's easier to just ignore it.
+		tmp := make([]byte, 1, 1)
+		_, _ = r.Read(tmp)
+		rs.cookie = cookie
+	}
+
+	zr, err := gzip.NewReader(rs)
+	if err != nil {
+		log.Fatal("gzip.NewReader: ", err)
 	}
 	return &pckReader{zr, r}
 }
