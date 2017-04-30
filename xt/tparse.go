@@ -3,8 +3,8 @@ package xt
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -16,13 +16,8 @@ type tParser struct {
 	t       Text
 }
 
-func tparse(n string, text Text, slicei interface{}) {
+func tparse(f io.Reader, text Text, slicei interface{}) {
 	slicev := reflect.Indirect(reflect.ValueOf(slicei))
-
-	f, err := os.Open(n)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// It's not really a csv file, but this works, so why not.
 	r := csv.NewReader(f)

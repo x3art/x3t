@@ -1,8 +1,10 @@
 package xt
 
-func GetCockpits(n string, text Text) []Cockpit {
+func GetCockpits(xf Xfiles, text Text) []Cockpit {
+	f := xf.Open("addon/types/TCockpits.txt")
+	defer f.Close()
 	ret := []Cockpit{}
-	tparse(n, text, &ret)
+	tparse(f, text, &ret)
 	return ret
 }
 

@@ -1,8 +1,10 @@
 package xt
 
-func GetLasers(n string, text Text) []Laser {
+func GetLasers(xf Xfiles, text Text) []Laser {
+	f := xf.Open("addon/types/TLasers.txt")
+	defer f.Close()
 	ret := []Laser{}
-	tparse(n, text, &ret)
+	tparse(f, text, &ret)
 	return ret
 }
 

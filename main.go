@@ -11,11 +11,6 @@ import (
 	"x3t/xt"
 )
 
-var shipsFile = flag.String("-ships", "data/TShips.txt", "ships file")
-var cockpitsFile = flag.String("-cockpits", "data/TCockpits.txt", "cockpits file")
-var lasersFile = flag.String("-lasers", "data/TLaser.txt", "lasers file")
-var universeFile = flag.String("-universe", "data/x3_universe.xml", "universe file")
-
 type state struct {
 	text     xt.Text
 	Ships    []xt.Ship
@@ -40,10 +35,10 @@ func main() {
 
 	st.text = xt.GetText(xf)
 
-	st.Ships = xt.GetShips(*shipsFile, st.text)
-	// st.cockpits = xt.GetCockpits(*cockpitsFile, text)
-	// st.lasers = xt.GetLasers(*lasersFile, text)
-	st.U = xt.GetUniverse(*universeFile)
+	st.Ships = xt.GetShips(xf, st.text)
+	// st.cockpits = xt.GetCockpits(xf, text)
+	// st.lasers = xt.GetLasers(xf, text)
+	st.U = xt.GetUniverse(xf)
 
 	fm := make(template.FuncMap)
 	st.mapFuncs(fm)

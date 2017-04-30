@@ -3,7 +3,6 @@ package xt
 import (
 	"encoding/xml"
 	"log"
-	"os"
 	"reflect"
 	"strconv"
 )
@@ -319,11 +318,8 @@ func elem(d *xml.Decoder, el *xml.StartElement, v reflect.Value) {
 	}
 }
 
-func GetUniverse(n string) (u Universe) {
-	f, err := os.Open(n)
-	if err != nil {
-		log.Fatal(err)
-	}
+func GetUniverse(xf Xfiles) (u Universe) {
+	f := xf.Open("addon/maps/x3_universe.xml")
 	defer f.Close()
 	d := xml.NewDecoder(f)
 	ok, el := nextEl(d, "universe")

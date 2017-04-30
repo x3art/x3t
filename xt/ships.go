@@ -1,8 +1,11 @@
 package xt
 
-func GetShips(n string, text Text) []Ship {
+func GetShips(xf Xfiles, text Text) []Ship {
+	f := xf.Open("addon/types/TShips.txt")
+	defer f.Close()
+
 	ret := []Ship{}
-	tparse(n, text, &ret)
+	tparse(f, text, &ret)
 	return ret
 }
 
