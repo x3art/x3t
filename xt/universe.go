@@ -128,10 +128,11 @@ type Gate struct {
 	// 4 - destroyed
 	// 5, 6, 7, 8 - Trans-orbital accelerator N, S, W, E
 	// 9 - 20 - xenon hub gates
-	S    int `x3t:"o:s"`
+	S int `x3t:"o:s"`
+	// Gx, Gy - destination sector coordinates
 	Gx   int `x3t:"o:gx"`
 	Gy   int `x3t:"o:gy"`
-	Gtid int `x3t:"o:gtid"`
+	Gtid int `x3t:"o:gtid"` // Destination gate direction.
 	F    int `x3t:"o:f"`
 }
 
