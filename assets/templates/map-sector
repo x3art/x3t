@@ -2,7 +2,7 @@
  <g>
   <rect class="s r{{.R}}" />
   <g transform="scale(0.12) translate(0.5 1.3)">
-{{- range $i, $row := (sectorName .)}}
+{{- range $i, $row := (lnBreak 11 (sectName .))}}
     <text y="{{$i}}" class="sectorname">{{$row}}</text>
 {{- end}}
 {{- range $i, $icon := (sectorIcons .)}}

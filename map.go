@@ -74,11 +74,11 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 			return "Unknown"
 		}
 	}
-	fm["sectorName"] = func(s xt.Sector) []string {
+	fm["lnBreak"] = func(maxl int, s string) []string {
 		ret := make([]string, 0)
-		for _, e := range strings.Split(s.Name(st.text), " ") {
-			// If two substrings are shorter than 11, combine them
-			if len(ret) != 0 && len(ret[len(ret)-1])+len(e) < 11 {
+		for _, e := range strings.Split(s, " ") {
+			// If two substrings are shorter than maxl, combine them
+			if len(ret) != 0 && len(ret[len(ret)-1])+len(e) < maxl {
 				ret[len(ret)-1] = ret[len(ret)-1] + " " + e
 			} else {
 				ret = append(ret, e)
@@ -107,7 +107,8 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 			ret = append(ret, "ore")
 		}
 		for i := range s.Docks {
-			// Complete guess, but it matches equipment docks and military outposts.
+			// Stab in the dark, but it matches some
+			// equipment docks and military outposts.
 			if st.Docks[s.Docks[i].S].GalaxySubtype == "SG_DOCK_EQUIP" {
 				ret = append(ret, "dock")
 				break
