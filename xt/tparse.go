@@ -42,16 +42,24 @@ func tparse(f io.Reader, text Text, slicei interface{}) {
 		if err != nil {
 			log.Fatal(err)
 		}
+		// XXX - this might be a comment/empty line.
+		if len(rec) == 1 {
+			continue
+		}
 		t := tParser{rec: rec, t: text}
 		err = t.pvalue(slicev.Index(i))
 		if err != nil {
+			log.Print("Line: ", rec)
 			log.Fatal(err)
 		}
 		if len(t.rec) == 1 && t.rec[0] == "" {
 			t.rec = t.rec[1:]
 		}
 		if len(t.rec) != 0 {
-			log.Fatalf("record not fully consumed: %v %v", t.rec, len(t.rec))
+			trimmed := strings.TrimLeft(t.rec[0], " \t")
+			if trimmed != "" && trimmed[0] != '/' {
+				log.Fatalf("record not fully consumed: %v %v", t.rec, len(t.rec))
+			}
 		}
 	}
 }
