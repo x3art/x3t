@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -31,7 +32,16 @@ type Text map[int]map[int]string
 func GetText(xf Xfiles) Text {
 	ret := make(Text)
 
+	names := make(sort.StringSlice, 0)
 	for fn := range xf.f["addon/t"] {
+		// Just english for now.
+		if !strings.HasSuffix(fn, "L044.xml") {
+			continue
+		}
+		names = append(names, fn)
+	}
+	names.Sort()
+	for _, fn := range names {
 		// Just english for now.
 		if !strings.HasSuffix(fn, "L044.xml") {
 			continue
