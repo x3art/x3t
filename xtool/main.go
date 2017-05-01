@@ -35,6 +35,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "No such file: %s\n", args[2])
 			os.Exit(1)
 		}
+		defer f.Close()
 		io.Copy(os.Stdout, f)
 	default:
 		usage()
