@@ -5,16 +5,19 @@
   {{- $st := .St}}
   <ul>Gates:
    {{- range .S.Gates}}
-    {{- $dir := (index "NSWE" .Gid)}}
-    {{- with ($st.U.SectorXY .Gx .Gy)}}
-     <li> {{printf "%c" $dir}} - <a href="/sector/{{.X}}/{{.Y}}">{{sectName .}}</a>
+    {{- if validGate .}}
+     {{- $dir := (index "NSWE" .Gid)}}
+     {{- with ($st.U.SectorXY .Gx .Gy)}}
+      <li> {{printf "%c" $dir}} - <a href="/sector/{{.X}}/{{.Y}}">{{sectName .}}</a>
+     {{- end}}
     {{- end}}
    {{- end}}
   </ul>
   {{- with .S.Docks}}
    <ul>Docks:
     {{- range .}}
-     <li> {{ (index $st.Docks .S).Description }}
+     {{- $d := (index $st.Docks .S)}}
+     <li> {{ $d.Description }}
     {{- end}}
    </ul>
   {{- end}}
