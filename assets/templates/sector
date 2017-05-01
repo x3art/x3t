@@ -1,7 +1,7 @@
 {{template "header"}}
   Sector: {{sectName .S}}<br />
   Race: {{raceName .S.R}}<br />
-  Suns: {{.S.SunPercent}}<br />
+  Suns: {{sunPercent .S}}%<br />
   {{- $st := .St}}
   {{- with .S.Gates}}
   <ul>Gates:

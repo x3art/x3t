@@ -17,6 +17,7 @@ type state struct {
 	cockpits []xt.Cockpit
 	lasers   []xt.Laser
 	Docks    map[string]xt.TDock
+	Suns     []xt.TSun
 	U        xt.Universe
 	tmpl     *template.Template
 }
@@ -44,6 +45,7 @@ func main() {
 		st.Docks[d.ObjectID] = d
 	}
 	st.U = xt.GetUniverse(xf)
+	st.Suns = xt.GetSuns(xf, st.text)
 
 	fm := make(template.FuncMap)
 	st.mapFuncs(fm)

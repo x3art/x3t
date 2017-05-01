@@ -40,7 +40,16 @@ func (st *state) sector(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (st *state) sunPercent(s xt.Sector) int {
+	x := 0
+	for i := range s.Suns {
+		x += st.Suns[s.Suns[i].S].Brightness
+	}
+	return x * 100 / 65536
+}
+
 func (st *state) mapFuncs(fm template.FuncMap) {
+	// XXX - clean this up, half of this doesn't belong here.
 	fm["sectName"] = func(s *xt.Sector) string {
 		return s.Name(st.text)
 	}
@@ -88,7 +97,7 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 	}
 	fm["sectorIcons"] = func(s xt.Sector) []string {
 		ret := []string{}
-		if s.SunPercent() > 150 {
+		if st.sunPercent(s) > 150 {
 			ret = append(ret, "sunny")
 		}
 		sil, ore := 0, 0
@@ -142,4 +151,5 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 			return "Unknown"
 		}
 	}
+	fm["sunPercent"] = st.sunPercent
 }

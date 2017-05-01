@@ -31,18 +31,6 @@ type Sector struct {
 	Specials   []Special  `x3t:"ot:20"`
 }
 
-func (s *Sector) SunPercent() int {
-	if len(s.Suns) == 1 {
-		if s.Suns[0].S == 0 {
-			return 100
-		} else {
-			return 150
-		}
-	} else {
-		return 100 * len(s.Suns)
-	}
-}
-
 func (s *Sector) Name(text Text) string {
 	r, _ := text.Get(7, 1020000+100*(s.Y+1)+(s.X+1))
 	return r
