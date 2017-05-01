@@ -78,6 +78,7 @@ var pckMap = map[string]string{
 	"dds":       "wtf",
 	"v":         "wtf",
 	"cutscenes": "wtf",
+	".":         "wtf",
 }
 
 // Must be called with native paths, we'll convert back to slashes.
@@ -86,7 +87,7 @@ func (xf *Xfiles) add(fn string, xd Xdata) {
 	if filepath.Ext(f) == ".pck" {
 		base := filepath.Base(d)
 		if pm := pckMap[base]; pm == "" {
-			log.Printf("Path '%s' has a .pck file without mapping", fn)
+			log.Printf("Path '%s' (%s) has a .pck file without mapping", fn, base)
 		} else {
 			f = strings.TrimSuffix(f, "pck") + pm
 		}
