@@ -128,4 +128,18 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 			return false
 		}
 	}
+	fm["asteroidType"] = func(i int) string {
+		switch i {
+		case 0:
+			return "Ore"
+		case 1:
+			return "Silicon Wafers"
+		case 2:
+			return "Nividium"
+		case 3:
+			return "Ice"
+		default:
+			return "Unknown"
+		}
+	}
 }

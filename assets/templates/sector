@@ -3,8 +3,9 @@
   Race: {{raceName .S.R}}<br />
   Suns: {{.S.SunPercent}}<br />
   {{- $st := .St}}
+  {{- with .S.Gates}}
   <ul>Gates:
-   {{- range .S.Gates}}
+   {{- range .}}
     {{- if validGate .}}
      {{- $dir := (index "NSWE" .Gid)}}
      {{- with ($st.U.SectorXY .Gx .Gy)}}
@@ -13,11 +14,19 @@
     {{- end}}
    {{- end}}
   </ul>
+  {{- end}}
   {{- with .S.Docks}}
    <ul>Docks:
     {{- range .}}
      {{- $d := (index $st.Docks .S)}}
      <li> {{ $d.Description }}
+    {{- end}}
+   </ul>
+  {{- end}}
+  {{- with .S.Asteroids}}
+   <ul>Asteroids:
+    {{- range .}}
+     <li> {{ asteroidType .Type }} - {{ .Amount }}
     {{- end}}
    </ul>
   {{- end}}
