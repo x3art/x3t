@@ -133,7 +133,7 @@ func (xf *Xfiles) parseCD(basename string) bool {
 		if err != nil {
 			log.Fatal(err)
 		}
-		xf.add(filepath.FromSlash(split[1]), cd{fd, off, off + i})
+		xf.add(filepath.FromSlash(split[1]), cd{fd, off, i})
 		off += i
 	}
 	return true
@@ -187,7 +187,7 @@ type nopclose struct {
 	readerWithAt
 }
 
-func (_ nopclose) Close() error {
+func (nc nopclose) Close() error {
 	return nil
 }
 
