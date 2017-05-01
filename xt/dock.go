@@ -24,7 +24,7 @@ type TDock struct {
 	InnerScene             string
 	Race                   int
 	Explosion              string
-	BosyExplosion          string
+	BodyExplosion          string
 	ShieldPowerGen         string
 	HUDIcon                string
 	Volume                 string
