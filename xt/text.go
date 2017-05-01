@@ -75,12 +75,12 @@ func (t Text) Get(pid, tid int) (string, error) {
 	if t[pid] == nil {
 		return "", fmt.Errorf("Bad page: %d", pid)
 	}
-	if t[pid][tid] == "" {
+	s, ok := t[pid][tid]
+	if !ok {
 		// This can't be fatal (yet?).
 		log.Printf("bad string ID: %d/%d", pid, tid)
 		return fmt.Sprintf("bad string %d,%d", pid, tid), nil
 	}
-	s := t[pid][tid]
 	for {
 		if m := reCurly.FindStringSubmatch(s); len(m) > 0 {
 			pid, err := strconv.Atoi(m[1])
