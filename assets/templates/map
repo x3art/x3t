@@ -147,11 +147,11 @@ svgPanZoom("#themap")
 $(document).ready(function() {
 	$(".sectorhover").hover(
 	  function() {
-	    var t = this.parentElement;
+	    var t = this.parentElement.parentElement;
 	    t.parentElement.appendChild(t);
 	    $(t).find("g:first").addClass("zoomedsector");
 	  }, function() {
-	    var t = this.parentElement;
+	    var t = this.parentElement.parentElement;
 	    $(t).find("g:first").removeClass("zoomedsector");
   	});
 });
