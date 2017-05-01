@@ -91,6 +91,8 @@ func (xf *Xfiles) add(fn string, xd Xdata) {
 			f = strings.TrimSuffix(f, "pck") + pm
 		}
 		xd = pck{xd}
+	} else if filepath.Ext(f) == ".pbd" {
+		xd = pck{xd}
 	}
 	d = strings.TrimSuffix(filepath.ToSlash(d), "/")
 	if xf.f[d] == nil {
