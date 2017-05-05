@@ -1,11 +1,12 @@
 package xt
 
-func GetSuns(xf Xfiles, text Text) []TSun {
-	f := xf.Open("addon/types/TSuns.txt")
-	defer f.Close()
-	ret := []TSun{}
-	tparse(f, text, &ret)
-	return ret
+func (x *X) GetSuns() []TSun {
+	x.sunsOnce.Do(func() {
+		f := x.xf.Open("addon/types/TSuns.txt")
+		defer f.Close()
+		tparse(f, x.GetText(), &x.suns)
+	})
+	return x.suns
 }
 
 // the only documentation of this I found was wrong.

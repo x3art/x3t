@@ -306,18 +306,20 @@ func elem(d *xml.Decoder, el *xml.StartElement, v reflect.Value) {
 	}
 }
 
-func GetUniverse(xf Xfiles) (u Universe) {
-	f := xf.Open("addon/maps/x3_universe.xml")
-	defer f.Close()
-	d := xml.NewDecoder(f)
-	ok, el := nextEl(d, "universe")
-	if !ok {
-		log.Fatal("not universe")
-	}
+func (x *X) GetUniverse() (u Universe) {
+	x.universeOnce.Do(func() {
+		f := x.xf.Open("addon/maps/x3_universe.xml")
+		defer f.Close()
+		d := xml.NewDecoder(f)
+		ok, el := nextEl(d, "universe")
+		if !ok {
+			log.Fatal("not universe")
+		}
 
-	elem(d, el, reflect.Indirect(reflect.ValueOf(&u)))
+		elem(d, el, reflect.Indirect(reflect.ValueOf(&x.universe)))
+	})
 
-	return u
+	return x.universe
 }
 
 func (u Universe) SectorXY(x, y int) *Sector {

@@ -1,11 +1,18 @@
 package xt
 
-func GetDocks(xf Xfiles, text Text) []TDock {
-	f := xf.Open("addon/types/TDocks.txt")
-	defer f.Close()
-	ret := []TDock{}
-	tparse(f, text, &ret)
-	return ret
+func (x *X) GetDocks() map[string]TDock {
+	x.docksOnce.Do(func() {
+		f := x.xf.Open("addon/types/TDocks.txt")
+		defer f.Close()
+		ds := []TDock{}
+		tparse(f, x.GetText(), &ds)
+		x.docks = make(map[string]TDock)
+		for _, d := range ds {
+			x.docks[d.ObjectID] = d
+		}
+	})
+
+	return x.docks
 }
 
 type TDock struct {

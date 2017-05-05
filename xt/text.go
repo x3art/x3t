@@ -29,53 +29,55 @@ type TextFile struct {
 
 type Text map[int]map[int]string
 
-func GetText(xf Xfiles) Text {
-	ret := make(Text)
+func (x *X) GetText() Text {
+	x.textOnce.Do(func() {
+		x.text = make(Text)
 
-	names := make(sort.StringSlice, 0)
-	for fn := range xf.f["addon/t"] {
-		// Just english for now.
-		if !strings.HasSuffix(fn, "L044.xml") {
-			continue
-		}
-		names = append(names, fn)
-	}
-	names.Sort()
-	for _, fn := range names {
-		// Just english for now.
-		if !strings.HasSuffix(fn, "L044.xml") {
-			continue
-		}
-		f := xf.Open("addon/t/" + fn)
-		defer f.Close()
-		d := xml.NewDecoder(f)
-		t := TextFile{}
-		d.Decode(&t)
-
-		merge := func(min, max int) {
-			for pi := range t.Pages {
-				px := &t.Pages[pi]
-				pid := px.Id
-				if pid >= max || pid < min {
-					continue
-				}
-				pid -= min
-				if _, ok := ret[pid]; !ok {
-					ret[pid] = make(map[int]string, len(px.T))
-				}
-				for ti := range px.T {
-					tx := &px.T[ti]
-					ret[pid][tx.Id] = tx.Value
-				}
+		names := make(sort.StringSlice, 0)
+		for fn := range x.xf.f["addon/t"] {
+			// Just english for now.
+			if !strings.HasSuffix(fn, "L044.xml") {
+				continue
 			}
-
+			names = append(names, fn)
 		}
-		merge(0, 300000)
-		merge(300000, 350000)
-		merge(350000, 380000)
-		merge(380000, 600000)
-	}
-	return ret
+		names.Sort()
+		for _, fn := range names {
+			// Just english for now.
+			if !strings.HasSuffix(fn, "L044.xml") {
+				continue
+			}
+			f := x.xf.Open("addon/t/" + fn)
+			defer f.Close()
+			d := xml.NewDecoder(f)
+			t := TextFile{}
+			d.Decode(&t)
+
+			merge := func(min, max int) {
+				for pi := range t.Pages {
+					px := &t.Pages[pi]
+					pid := px.Id
+					if pid >= max || pid < min {
+						continue
+					}
+					pid -= min
+					if _, ok := x.text[pid]; !ok {
+						x.text[pid] = make(map[int]string, len(px.T))
+					}
+					for ti := range px.T {
+						tx := &px.T[ti]
+						x.text[pid][tx.Id] = tx.Value
+					}
+				}
+
+			}
+			merge(0, 300000)
+			merge(300000, 350000)
+			merge(350000, 380000)
+			merge(380000, 600000)
+		}
+	})
+	return x.text
 }
 
 var reCurly = regexp.MustCompile("\\{([[:digit:]]+),([[:digit:]]+)\\}")

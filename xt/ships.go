@@ -1,12 +1,13 @@
 package xt
 
-func GetShips(xf Xfiles, text Text) []Ship {
-	f := xf.Open("addon/types/TShips.txt")
-	defer f.Close()
+func (x *X) GetShips() []Ship {
+	x.shipsOnce.Do(func() {
+		f := x.xf.Open("addon/types/TShips.txt")
+		defer f.Close()
 
-	ret := []Ship{}
-	tparse(f, text, &ret)
-	return ret
+		tparse(f, x.GetText(), &x.ships)
+	})
+	return x.ships
 }
 
 type Ship struct {
