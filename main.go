@@ -12,14 +12,12 @@ import (
 )
 
 type state struct {
-	text     xt.Text
-	Ships    []xt.Ship
-	cockpits []xt.Cockpit
-	lasers   []xt.Laser
-	Docks    map[string]xt.TDock
-	Suns     []xt.TSun
-	U        xt.Universe
-	tmpl     *template.Template
+	x     *xt.X
+	Ships []xt.Ship
+	Docks map[string]xt.TDock
+	Suns  []xt.TSun
+	U     xt.Universe
+	tmpl  *template.Template
 }
 
 var rootTemplates = map[string]string{
@@ -31,21 +29,14 @@ var rootTemplates = map[string]string{
 func main() {
 	flag.Parse()
 
-	xf := xt.XFiles(flag.Arg(0))
-
 	st := state{}
 
-	st.text = xt.GetText(xf)
+	st.x = xt.NewX(flag.Arg(0))
 
-	st.Ships = xt.GetShips(xf, st.text)
-	// st.cockpits = xt.GetCockpits(xf, text)
-	// st.lasers = xt.GetLasers(xf, text)
-	st.Docks = make(map[string]xt.TDock)
-	for _, d := range xt.GetDocks(xf, st.text) {
-		st.Docks[d.ObjectID] = d
-	}
-	st.U = xt.GetUniverse(xf)
-	st.Suns = xt.GetSuns(xf, st.text)
+	st.Ships = st.x.GetShips()
+	st.Docks = st.x.GetDocks()
+	st.Suns = st.x.GetSuns()
+	st.U = st.x.GetUniverse()
 
 	fm := make(template.FuncMap)
 	st.mapFuncs(fm)

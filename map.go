@@ -51,7 +51,7 @@ func (st *state) sunPercent(s xt.Sector) int {
 func (st *state) mapFuncs(fm template.FuncMap) {
 	// XXX - clean this up, half of this doesn't belong here.
 	fm["sectName"] = func(s *xt.Sector) string {
-		return s.Name(st.text)
+		return s.Name(st.x.GetText())
 	}
 	fm["raceName"] = func(r int) string {
 		switch r {
