@@ -14,9 +14,10 @@ type tParser struct {
 	rec     []string
 	lastTag string
 	t       Text
+	x       *X
 }
 
-func tparse(f io.Reader, text Text, slicei interface{}) {
+func (x *X) tparse(f io.Reader, slicei interface{}) {
 	slicev := reflect.Indirect(reflect.ValueOf(slicei))
 
 	// It's not really a csv file, but this works, so why not.
@@ -32,7 +33,7 @@ func tparse(f io.Reader, text Text, slicei interface{}) {
 		Ver  int
 		Nrec int
 	}{}
-	t := tParser{rec: rec, t: text}
+	t := tParser{rec: rec, t: x.GetText(), x: x}
 	t.parseAll(&inf)
 
 	slicev.Set(reflect.MakeSlice(slicev.Type(), inf.Nrec, inf.Nrec))
@@ -46,7 +47,7 @@ func tparse(f io.Reader, text Text, slicei interface{}) {
 		if len(rec) == 1 {
 			continue
 		}
-		t := tParser{rec: rec, t: text}
+		t := tParser{rec: rec, t: x.GetText(), x: x}
 		err = t.pvalue(slicev.Index(i))
 		if err != nil {
 			log.Print("Line: ", rec)
@@ -192,6 +193,24 @@ func (t *tParser) pslice(v reflect.Value) error {
 	return nil
 }
 
+func (t *tParser) pptr(v reflect.Value) error {
+	if t.lastTag == "" {
+		return fmt.Errorf("Pointer without tag")
+	}
+	tags := tagParse(t.lastTag)
+	if ref := tags["tref"]; ref != "" {
+		valref, err := t.x.typeLookup(ref, t.rec[0], tags["index"] == "true")
+		if err != nil {
+			return err
+		}
+		t.rec = t.rec[1:]
+		v.Set(valref)
+		return nil
+	} else {
+		return fmt.Errorf("Don't know how to handle tag: %s", t.lastTag)
+	}
+}
+
 func (t *tParser) pvalue(v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Int:
@@ -206,6 +225,8 @@ func (t *tParser) pvalue(v reflect.Value) error {
 		return t.pstruct(v)
 	case reflect.Slice:
 		return t.pslice(v)
+	case reflect.Ptr:
+		return t.pptr(v)
 	default:
 		return fmt.Errorf("bad kind: %v", v.Kind())
 	}

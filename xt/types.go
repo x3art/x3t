@@ -1,10 +1,34 @@
 package xt
 
+import (
+	"fmt"
+	"reflect"
+	"strconv"
+)
+
+func (x *X) typeLookup(typ string, value string, index bool) (reflect.Value, error) {
+	var ind int
+	if index {
+		i, err := strconv.Atoi(value)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		ind = i
+	}
+	switch typ {
+	case "Shields":
+		sh := x.GetShields()
+		return reflect.ValueOf(&sh[ind]), nil
+	default:
+		return reflect.Value{}, fmt.Errorf("unknown type: %s", typ)
+	}
+}
+
 func (x *X) GetSuns() []TSun {
 	x.sunsOnce.Do(func() {
 		f := x.xf.Open("addon/types/TSuns.txt")
 		defer f.Close()
-		tparse(f, x.GetText(), &x.suns)
+		x.tparse(f, &x.suns)
 	})
 	return x.suns
 }
@@ -37,7 +61,7 @@ func (x *X) GetShips() []Ship {
 		f := x.xf.Open("addon/types/TShips.txt")
 		defer f.Close()
 
-		tparse(f, x.GetText(), &x.ships)
+		x.tparse(f, &x.ships)
 	})
 	return x.ships
 }
@@ -75,8 +99,9 @@ type Ship struct {
 	// Weapons recharge rate - how is it related to TLaser.txt recharge rate?
 	WeaponsRechargeRate float64
 	// Shield type - biggest shield the ship can equip - index to TShields.txt
-	ShieldType string
-	// Max shield count - Maximum number of shileds",
+	//ShieldType string
+	ShieldType *TShield `x3t:"tref:Shields,index"`
+	// Max shield count - Maximum number of shields
 	MaxShieldCount int
 	// Possible missiles - bit mask
 	PossibleMissiles int
@@ -166,13 +191,15 @@ type Ship struct {
 	ShipID string
 }
 
+/*
 func GetCockpits(xf Xfiles, text Text) []Cockpit {
 	f := xf.Open("addon/types/TCockpits.txt")
 	defer f.Close()
 	ret := []Cockpit{}
-	tparse(f, text, &ret)
+	x.tparse(f, &ret)
 	return ret
 }
+*/
 
 type Cockpit struct {
 	BodyFile               string
@@ -201,7 +228,7 @@ func (x *X) GetDocks() map[string]TDock {
 		f := x.xf.Open("addon/types/TDocks.txt")
 		defer f.Close()
 		ds := []TDock{}
-		tparse(f, x.GetText(), &ds)
+		x.tparse(f, &ds)
 		x.docks = make(map[string]TDock)
 		for _, d := range ds {
 			x.docks[d.ObjectID] = d
@@ -242,6 +269,7 @@ type TDock struct {
 	ObjectID               string
 }
 
+/*
 func GetLasers(xf Xfiles, text Text) []Laser {
 	f := xf.Open("addon/types/TLasers.txt")
 	defer f.Close()
@@ -249,6 +277,7 @@ func GetLasers(xf Xfiles, text Text) []Laser {
 	tparse(f, text, &ret)
 	return ret
 }
+*/
 
 type Laser struct {
 	BodyFile               string
@@ -281,7 +310,7 @@ func (x *X) GetShields() []TShield {
 		f := x.xf.Open("addon/types/TShields.txt")
 		defer f.Close()
 
-		tparse(f, x.GetText(), &x.shields)
+		x.tparse(f, &x.shields)
 	})
 	return x.shields
 }
