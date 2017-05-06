@@ -1,4 +1,6 @@
 {{template "header"}}
   {{.Description}} {{.Variation}}<br/>
+  Class: {{.ClassDescription}}<br />
   Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
+  Shield: {{calc .ShieldType.Strength .MaxShieldCount "*" 1000 "/"}} MJ
 {{template "footer"}}
