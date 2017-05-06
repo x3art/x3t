@@ -2,6 +2,11 @@ package xt
 
 import "sync"
 
+type typeCache struct {
+	once sync.Once
+	v    interface{}
+}
+
 // Each thing we access is loaded and parsed on demand. To synchronize
 // this, each member is protected by a sync.Once.
 type X struct {
@@ -10,23 +15,21 @@ type X struct {
 	textOnce sync.Once
 	text     Text
 
-	shipsOnce sync.Once
-	ships     []Ship
-
 	docksOnce sync.Once
 	docks     map[string]TDock
 
-	sunsOnce sync.Once
-	suns     []TSun
+	typeCache map[string]*typeCache
 
 	universeOnce sync.Once
 	universe     Universe
-
-	shieldsOnce sync.Once
-	shields     []TShield
 }
 
 // Get all the information we can get from an X3 installation.
 func NewX(dir string) *X {
-	return &X{xf: XFiles(dir)}
+	x := &X{xf: XFiles(dir)}
+	x.typeCache = make(map[string]*typeCache)
+	for k := range typeMap {
+		x.typeCache[k] = &typeCache{}
+	}
+	return x
 }

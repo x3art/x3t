@@ -18,8 +18,10 @@ type tParser struct {
 }
 
 func (x *X) tparse(f io.Reader, slicei interface{}) {
-	slicev := reflect.Indirect(reflect.ValueOf(slicei))
+	x.tparsev(f, reflect.Indirect(reflect.ValueOf(slicei)))
+}
 
+func (x *X) tparsev(f io.Reader, slicev reflect.Value) {
 	// It's not really a csv file, but this works, so why not.
 	r := csv.NewReader(f)
 	r.Comment = '/'

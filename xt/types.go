@@ -6,31 +6,40 @@ import (
 	"strconv"
 )
 
+var typeMap = map[string]struct {
+	fn string
+	t  reflect.Type
+}{
+	"Suns":    {"addon/types/TSuns.txt", reflect.TypeOf(TSun{})},
+	"Shields": {"addon/types/TShields.txt", reflect.TypeOf(TShield{})},
+	"Ships":   {"addon/types/TShips.txt", reflect.TypeOf(Ship{})},
+}
+
 func (x *X) typeLookup(typ string, value string, index bool) (reflect.Value, error) {
-	var ind int
+	t := x.getType(typ)
 	if index {
 		i, err := strconv.Atoi(value)
 		if err != nil {
 			return reflect.Value{}, err
 		}
-		ind = i
+		return reflect.ValueOf(t).Index(i).Addr(), nil
 	}
-	switch typ {
-	case "Shields":
-		sh := x.GetShields()
-		return reflect.ValueOf(&sh[ind]), nil
-	default:
-		return reflect.Value{}, fmt.Errorf("unknown type: %s", typ)
-	}
+	return reflect.Value{}, fmt.Errorf("not implemented")
+}
+
+func (x *X) getType(t string) interface{} {
+	x.typeCache[t].once.Do(func() {
+		f := x.xf.Open(typeMap[t].fn)
+		defer f.Close()
+		v := reflect.Indirect(reflect.New(reflect.SliceOf(typeMap[t].t)))
+		x.tparsev(f, v)
+		x.typeCache[t].v = v.Interface()
+	})
+	return x.typeCache[t].v
 }
 
 func (x *X) GetSuns() []TSun {
-	x.sunsOnce.Do(func() {
-		f := x.xf.Open("addon/types/TSuns.txt")
-		defer f.Close()
-		x.tparse(f, &x.suns)
-	})
-	return x.suns
+	return x.getType("Suns").([]TSun)
 }
 
 // the only documentation of this I found was wrong.
@@ -57,13 +66,7 @@ type TSun struct {
 }
 
 func (x *X) GetShips() []Ship {
-	x.shipsOnce.Do(func() {
-		f := x.xf.Open("addon/types/TShips.txt")
-		defer f.Close()
-
-		x.tparse(f, &x.ships)
-	})
-	return x.ships
+	return x.getType("Ships").([]Ship)
 }
 
 type Ship struct {
@@ -120,6 +123,7 @@ type Ship struct {
 	TurretDescriptor [6]struct {
 		// Cockpit index - index to TCockpits.txt
 		CIndex int
+		//Cockpit *Cockpit `x3t:"tref:Cockpits,index"`
 		// Cockpit position - front, rear, left, right, top, bottom - not sure what it's used for
 		CPos int
 	}
@@ -306,13 +310,7 @@ type Laser struct {
 }
 
 func (x *X) GetShields() []TShield {
-	x.shieldsOnce.Do(func() {
-		f := x.xf.Open("addon/types/TShields.txt")
-		defer f.Close()
-
-		x.tparse(f, &x.shields)
-	})
-	return x.shields
+	return x.getType("Shields").([]TShield)
 }
 
 type TShield struct {
