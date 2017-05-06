@@ -275,3 +275,37 @@ type Laser struct {
 	Skin                   string
 	OjectID                string
 }
+
+func (x *X) GetShields() []TShield {
+	x.shieldsOnce.Do(func() {
+		f := x.xf.Open("addon/types/TShields.txt")
+		defer f.Close()
+
+		tparse(f, x.GetText(), &x.shields)
+	})
+	return x.shields
+}
+
+type TShield struct {
+	BodyFile               string
+	PictureID              string
+	Yaw                    float64
+	Pitch                  float64
+	Roll                   float64
+	Index                  string
+	Description            string `x3t:"page:17"`
+	ChargeRate             int    // kJ/s
+	Strength               int    // kJ
+	HitEffect              string
+	Efficiency             string
+	Volume                 string
+	ProductionRelValNPC    int
+	PriceModifier1         int
+	PriceModifier2         int
+	WareClass              string
+	ProductionRelValPlayer int
+	MinNotoriety           int
+	VideoID                string
+	Skin                   string
+	ObjectID               string
+}

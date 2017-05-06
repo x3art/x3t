@@ -21,6 +21,9 @@ type X struct {
 
 	universeOnce sync.Once
 	universe     Universe
+
+	shieldsOnce sync.Once
+	shields     []TShield
 }
 
 // Get all the information we can get from an X3 installation.
