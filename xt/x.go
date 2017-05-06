@@ -1,6 +1,9 @@
 package xt
 
-import "sync"
+import (
+	"io"
+	"sync"
+)
 
 type typeCache struct {
 	once sync.Once
@@ -32,4 +35,8 @@ func NewX(dir string) *X {
 		x.typeCache[k] = &typeCache{}
 	}
 	return x
+}
+
+func (x *X) Open(f string) io.Reader {
+	return x.xf.Open(f)
 }

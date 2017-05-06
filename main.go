@@ -7,9 +7,15 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"image"
 	"log"
 	"net/http"
+	"time"
 	"x3t/xt"
+
+	"image/png"
+
+	_ "github.com/lukegb/dds"
 )
 
 type state struct {
@@ -111,6 +117,20 @@ func main() {
 			})
 		}
 	}
+
+	http.HandleFunc("/foo.png", func(w http.ResponseWriter, req *http.Request) {
+		img, _, err := image.Decode(st.x.Open("dds/interface_icons_XT_diff.dds"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		b := bytes.NewBuffer(nil)
+		err = png.Encode(b, img)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// xxx - it wold be nice if xf could return a ModTime.
+		http.ServeContent(w, req, "/foo.png", time.Time{}, bytes.NewReader(b.Bytes()))
+	})
 
 	log.Printf("now")
 	log.Fatal(http.ListenAndServe(":8080", nil))
