@@ -74,8 +74,8 @@ var pckMap = map[string]string{
 	"scripts":  "xml",
 	"maps":     "xml",
 	"director": "xml",
+	"dds":      "dds",
 	// XXX - no idea about the directories below, just shut up the warning for now.
-	"dds":       "wtf",
 	"v":         "wtf",
 	"cutscenes": "wtf",
 	".":         "wtf",
