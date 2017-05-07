@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"strings"
 )
@@ -19,7 +20,10 @@ func (st *state) ship(w http.ResponseWriter, req *http.Request) {
 
 	for i := range st.Ships {
 		if st.Ships[i].Description == name && st.Ships[i].Variation == variation {
-			st.tmpl.ExecuteTemplate(w, "ship", st.Ships[i])
+			err := st.tmpl.ExecuteTemplate(w, "ship", st.Ships[i])
+			if err != nil {
+				log.Print(err)
+			}
 			return
 		}
 	}
