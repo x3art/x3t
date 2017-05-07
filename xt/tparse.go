@@ -217,6 +217,8 @@ func (t *tParser) pvalue(v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Int:
 		return t.pint(v)
+	case reflect.Uint:
+		return t.pint(v)
 	case reflect.Float64:
 		return t.pfloat(v)
 	case reflect.String:
