@@ -14,7 +14,7 @@ var typeMap = map[string]struct {
 	"Shields":  {"addon/types/TShields.txt", reflect.TypeOf(TShield{})},
 	"Ships":    {"addon/types/TShips.txt", reflect.TypeOf(Ship{})},
 	"Cockpits": {"addon/types/TCockpits.txt", reflect.TypeOf(Cockpit{})},
-	"Lasers":   {"addon/types/TLasers.txt", reflect.TypeOf(TLaser{})},
+	"Lasers":   {"addon/types/TLaser.txt", reflect.TypeOf(TLaser{})},
 }
 
 func (x *X) typeLookup(typ string, value string, index bool) (reflect.Value, error) {
@@ -183,8 +183,7 @@ type Ship struct {
 	PriceModifier1 int
 	// Price modifier (2)
 	PriceModifier2 int
-	// Ware class - ignored
-	WareClass string
+	WareClass      int
 	// Production RelVal (player) - Price for the player (it's not really a price)
 	ProductionRelValPlayer int
 	// Min. Notoriety - minimum notoriety the player must have with corresponding race to be able to buy the ship
@@ -211,7 +210,7 @@ type Cockpit struct {
 	ProductionRelValNPC    string
 	PriceModifier1         string
 	PriceModifier2         string
-	WareClass              string
+	WareClass              int
 	ProductionRelValPlayer string
 	MinNotoriety           string
 	VideoID                string
@@ -257,12 +256,16 @@ type TDock struct {
 	ProductionRelValNPC    int
 	PriceModifier1         int
 	PriseModifier2         int
-	WareClass              string
+	WareClass              int
 	ProductionRelValPlayer int
 	MinNotoriety           int
 	VideoID                string
 	Skin                   string
 	ObjectID               string
+}
+
+func (x *X) GetLasers() []TLaser {
+	return x.getType("Lasers").([]TLaser)
 }
 
 type TLaser struct {
@@ -283,7 +286,7 @@ type TLaser struct {
 	ProductionRelValNPC    string
 	PriceMod1              string
 	PriceMod2              string
-	WareClass              string
+	WareClass              int
 	ProductionRelValPlayer string
 	MinNotoriety           string
 	VideoID                string
@@ -311,7 +314,7 @@ type TShield struct {
 	ProductionRelValNPC    int
 	PriceModifier1         int
 	PriceModifier2         int
-	WareClass              string
+	WareClass              int
 	ProductionRelValPlayer int
 	MinNotoriety           int
 	VideoID                string
