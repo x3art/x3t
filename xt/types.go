@@ -10,9 +10,11 @@ var typeMap = map[string]struct {
 	fn string
 	t  reflect.Type
 }{
-	"Suns":    {"addon/types/TSuns.txt", reflect.TypeOf(TSun{})},
-	"Shields": {"addon/types/TShields.txt", reflect.TypeOf(TShield{})},
-	"Ships":   {"addon/types/TShips.txt", reflect.TypeOf(Ship{})},
+	"Suns":     {"addon/types/TSuns.txt", reflect.TypeOf(TSun{})},
+	"Shields":  {"addon/types/TShields.txt", reflect.TypeOf(TShield{})},
+	"Ships":    {"addon/types/TShips.txt", reflect.TypeOf(Ship{})},
+	"Cockpits": {"addon/types/TCockpits.txt", reflect.TypeOf(Cockpit{})},
+	"Lasers":   {"addon/types/TLasers.txt", reflect.TypeOf(TLaser{})},
 }
 
 func (x *X) typeLookup(typ string, value string, index bool) (reflect.Value, error) {
@@ -122,8 +124,8 @@ type Ship struct {
 	// Turret descriptor - fixed length array - the reason why there is only 6 + 1 turrets
 	TurretDescriptor [6]struct {
 		// Cockpit index - index to TCockpits.txt
-		CIndex int
-		//Cockpit *Cockpit `x3t:"tref:Cockpits,index"`
+		//CIndex int
+		Cockpit *Cockpit `x3t:"tref:Cockpits,index"`
 		// Cockpit position - front, rear, left, right, top, bottom - not sure what it's used for
 		CPos int
 	}
@@ -195,16 +197,6 @@ type Ship struct {
 	ShipID string
 }
 
-/*
-func GetCockpits(xf Xfiles, text Text) []Cockpit {
-	f := xf.Open("addon/types/TCockpits.txt")
-	defer f.Close()
-	ret := []Cockpit{}
-	x.tparse(f, &ret)
-	return ret
-}
-*/
-
 type Cockpit struct {
 	BodyFile               string
 	PictureID              string
@@ -273,17 +265,7 @@ type TDock struct {
 	ObjectID               string
 }
 
-/*
-func GetLasers(xf Xfiles, text Text) []Laser {
-	f := xf.Open("addon/types/TLasers.txt")
-	defer f.Close()
-	ret := []Laser{}
-	tparse(f, text, &ret)
-	return ret
-}
-*/
-
-type Laser struct {
+type TLaser struct {
 	BodyFile               string
 	PictureID              string
 	RotX                   float64
