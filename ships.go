@@ -1,9 +1,11 @@
 package main
 
 import (
+	"html/template"
 	"log"
 	"net/http"
 	"strings"
+	"x3t/xt"
 )
 
 func (st *state) ship(w http.ResponseWriter, req *http.Request) {
@@ -29,4 +31,29 @@ func (st *state) ship(w http.ResponseWriter, req *http.Request) {
 	}
 
 	http.NotFound(w, req)
+}
+
+var cockpitPos = []string{
+	"",
+	"Front",
+	"Rear",
+	"Left",
+	"Right",
+	"Top",
+	"Bottom",
+}
+
+func (st *state) shipFuncs(fm template.FuncMap) {
+	fm["maskToLasers"] = func(mask int, wareclass int) (ret []*xt.TLaser) {
+		ls := st.x.GetLasers()
+		for i := range st.x.GetLasers() {
+			if ls[i].WareClass <= wareclass && (st.x.LtMask(ls[i].Index)&uint(mask)) != 0 {
+				ret = append(ret, &ls[i])
+			}
+		}
+		return
+	}
+	fm["cockpitPos"] = func(p int) string {
+		return cockpitPos[p]
+	}
 }

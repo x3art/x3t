@@ -79,19 +79,22 @@ func main() {
 	st.Suns = st.x.GetSuns()
 	st.U = st.x.GetUniverse()
 
+	st.tmpl = template.New("")
+
+	// Register various template funcs that we need.
 	fm := make(template.FuncMap)
 	fm["calc"] = calc
-
 	st.mapFuncs(fm)
-
-	st.tmpl = template.New("")
+	st.shipFuncs(fm)
 	st.tmpl.Funcs(fm)
+
 	if tmplDir, err := AssetDir("templates"); err == nil {
 		for _, tn := range tmplDir {
 			template.Must(st.tmpl.New(tn).Parse(string(MustAsset("templates/" + tn))))
 		}
 	}
 
+	// Why don't these templates live in their own "directory" in assets like static do?
 	for n := range rootTemplates {
 		t := rootTemplates[n]
 		http.HandleFunc(n, func(w http.ResponseWriter, req *http.Request) {
