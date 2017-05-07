@@ -3,4 +3,26 @@
   Class: {{.ClassDescription}}<br />
   Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
   Shield: {{calc .ShieldType.Strength .MaxShieldCount "*" 1000 "/"}} MJ
+  <ul> Lasers
+{{- $ship := .}}
+{{- with maskToLasers .PossibleLasers $ship.WareClass}}
+   <li>  Main: {{ (index $ship.GunGroup 0).NumGuns }}
+     <ul>
+ {{- range .}}
+      <li> {{.Description}}
+ {{- end}}
+     </ul>
+{{- end}}
+{{- range $index, $td := .TurretDescriptor}}
+ {{- $pos := .CPos}}
+ {{- with maskToLasers .Cockpit.LaserMask $ship.WareClass}}
+   <li>  {{ cockpitPos $pos }} {{ (index $ship.GunGroup (calc $index 1 "+")).NumGuns }}
+     <ul>
+  {{- range . }}
+      <li> {{.Description}}
+  {{- end}}
+     </ul>
+ {{- end}}
+{{- end}}
+  </ul>
 {{template "footer"}}
