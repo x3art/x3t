@@ -1,4 +1,21 @@
 {{template "header"}}
+{{$q:=.Q}}
+<div>
+<form action="/ships">
+Class:
+{{- range shipClassList}}
+<input type="checkbox" name="class" value="{{.}}"{{if (isChecked $q "class" .)}} checked{{end}}>
+{{.}}
+{{- end}}<br />
+Race:
+{{- range raceList}}
+<input type="checkbox" name="race" value="{{.}}"{{if (isChecked $q "race" (print .))}} checked{{end}}>
+{{raceName .}}
+{{- end}}<br />
+
+<input type="submit" value="Submit">
+</form>
+</div>
 <table id="ships" class="tablesorter">
  <thead>
   <tr>

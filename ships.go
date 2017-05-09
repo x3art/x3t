@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"x3t/xt"
@@ -34,14 +35,12 @@ func (st *state) ship(w http.ResponseWriter, req *http.Request) {
 	http.NotFound(w, req)
 }
 
-type shipsReq struct {
-	Ships []*xt.Ship
-}
-
+// filters out a set of ships from all the ships
 type shipFilter interface {
 	Match(*xt.Ship) bool
 }
 
+// set union
 type sfUnion []shipFilter
 
 func (u sfUnion) Match(s *xt.Ship) bool {
@@ -53,6 +52,7 @@ func (u sfUnion) Match(s *xt.Ship) bool {
 	return false
 }
 
+// set intersection
 type sfIntersection []shipFilter
 
 func (i sfIntersection) Match(s *xt.Ship) bool {
@@ -95,6 +95,11 @@ var shipFilters = map[string]sfInit{
 	"race":  sfRaceInit,
 }
 
+type shipsReq struct {
+	Ships []*xt.Ship
+	Q     url.Values
+}
+
 func (st *state) ships(w http.ResponseWriter, req *http.Request) {
 	q := req.URL.Query()
 
@@ -126,7 +131,7 @@ func (st *state) ships(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	sr := shipsReq{}
+	sr := shipsReq{Q: q}
 	for i := range st.Ships {
 		s := &st.Ships[i]
 		if inter.Match(s) {
@@ -175,5 +180,19 @@ func (st *state) shipFuncs(fm template.FuncMap) {
 			n += x.GunGroup[i].NumGuns
 		}
 		return n
+	}
+	fm["shipClassList"] = func() []string {
+		return []string{"M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "TS", "TL", "TM"}
+	}
+	fm["isChecked"] = func(q url.Values, k, v string) bool {
+		for _, val := range q[k] {
+			if val == v {
+				return true
+			}
+		}
+		return false
+	}
+	fm["raceList"] = func() []int {
+		return []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 19}
 	}
 }
