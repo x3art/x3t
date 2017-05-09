@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"x3t/xt"
 )
@@ -41,16 +42,6 @@ type shipFilter interface {
 	Match(*xt.Ship) bool
 }
 
-type sfClass string
-
-func (c sfClass) Match(s *xt.Ship) bool {
-	return s.ClassDescription == string(c) || s.ClassDescription == "OBJ_SHIP_"+string(c)
-}
-
-func sfClassInit(s string) shipFilter {
-	return sfClass(s)
-}
-
 type sfUnion []shipFilter
 
 func (u sfUnion) Match(s *xt.Ship) bool {
@@ -73,16 +64,35 @@ func (i sfIntersection) Match(s *xt.Ship) bool {
 	return true
 }
 
-type sfTrue struct{}
+type sfInit func(string) shipFilter
 
-func (_ sfTrue) Match(s *xt.Ship) bool {
-	return true
+type sfClass string
+
+func (c sfClass) Match(s *xt.Ship) bool {
+	return s.ClassDescription == string(c) || s.ClassDescription == "OBJ_SHIP_"+string(c)
 }
 
-type sfInit func(string) shipFilter
+func sfClassInit(s string) shipFilter {
+	return sfClass(s)
+}
+
+type sfRace int
+
+func (r sfRace) Match(s *xt.Ship) bool {
+	return sfRace(s.Race) == r
+}
+
+func sfRaceInit(s string) shipFilter {
+	x, err := strconv.Atoi(s)
+	if err != nil {
+		return nil
+	}
+	return sfRace(x)
+}
 
 var shipFilters = map[string]sfInit{
 	"class": sfClassInit,
+	"race":  sfRaceInit,
 }
 
 func (st *state) ships(w http.ResponseWriter, req *http.Request) {
@@ -102,11 +112,17 @@ func (st *state) ships(w http.ResponseWriter, req *http.Request) {
 			// longer than the code required.
 			un := sfUnion{}
 			for i := range vals {
-				un = append(un, sfinit(vals[i]))
+				sf := sfinit(vals[i])
+				if sf == nil {
+					http.NotFound(w, req)
+					return
+				}
+				un = append(un, sf)
 			}
 			inter = append(inter, un)
 		} else {
 			http.NotFound(w, req)
+			return
 		}
 	}
 

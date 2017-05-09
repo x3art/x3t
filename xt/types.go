@@ -133,8 +133,8 @@ type Ship struct {
 	DockingSlots int
 	// Cargo type - maximum cargo size the ship can carry - Ware class of TWare.txts
 	CargoType string
-	// Race - Race of the ship. Probably only used in Jobs.txt
-	Race         string
+	// Race - Race of the ship.
+	Race         int
 	HullStrength int
 	// Explosion definition - index to Effects.txt
 	ExplosionDefinition string
