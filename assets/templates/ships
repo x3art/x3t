@@ -1,7 +1,28 @@
 {{template "header"}}
- <ul>
+<table id="ships" class="tablesorter">
+ <thead>
+  <tr>
+   <th>Name</th>
+   <th>Variation</th>
+  </tr>
+ </thead>
+ <tbody>
 {{- range .Ships}}
-  <li><a href="/ship/{{.Description}}{{if .Variation}}/{{.Variation}}{{end}}">{{.Description}} {{.Variation}}</a>
+   <tr class="ship-link" data-href="/ship/{{.Description}}{{if .Variation}}/{{.Variation}}{{end}}">
+    <td>{{.Description}}</td>
+    <td>{{.Variation}}</td>
+   </tr>
 {{- end}}
- </ul>
+ </tbody>
+</table>
+<script src="/static/jquery.min.js"></script>
+<script src="/static/jquery.tablesorter.min.js"></script>
+<script>
+$(document).ready(function() {
+ $(".ship-link").click(function() {
+  window.location = $(this).data("href");
+ });
+ $("#ships").tablesorter();
+});
+</script>
 {{template "footer"}}

@@ -9,4 +9,7 @@ svg-pan-zoom.js is:
 <p>
 Icons are from material.io, under an <a href="https://raw.githubusercontent.com/google/material-design-icons/master/LICENSE">Apache 2.0 license</a>.
 </p>
+<p>
+jquery.tablesorter.min.js and associated styles are from: <a href="http://tablesorter.com/">Christian Bach</a> under an <a href="http://www.opensource.org/licenses/mit-license.php">MIT</a> license.
+</p>
 {{template "footer"}}
