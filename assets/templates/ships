@@ -2,15 +2,21 @@
 <table id="ships" class="tablesorter">
  <thead>
   <tr>
-   <th>Name</th>
-   <th>Variation</th>
+   <th>Name/Variation</th>
+   <th>Class</th>
+   <th>Shield (MJ)</th>
+   <th>Max Cargo</th>
+   <th>Laser count</th>
   </tr>
  </thead>
  <tbody>
 {{- range .Ships}}
-   <tr class="ship-link" data-href="/ship/{{.Description}}{{if .Variation}}/{{.Variation}}{{end}}">
-    <td>{{.Description}}</td>
-    <td>{{.Variation}}</td>
+   <tr>
+    <td><a href="/ship/{{.Description}}{{if .Variation}}/{{.Variation}}{{end}}">{{.Description}} {{.Variation}}</a></td>
+    <td>{{shipClassName .ClassDescription}}</td>
+    <td>{{calc .ShieldType.Strength .MaxShieldCount "*" 1000 "/"}}</td>
+    <td>{{.CargoMax}}</td>
+    <td>{{countGuns .}}</td>
    </tr>
 {{- end}}
  </tbody>
@@ -19,9 +25,6 @@
 <script src="/static/jquery.tablesorter.min.js"></script>
 <script>
 $(document).ready(function() {
- $(".ship-link").click(function() {
-  window.location = $(this).data("href");
- });
  $("#ships").tablesorter();
 });
 </script>

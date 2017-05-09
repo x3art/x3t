@@ -60,4 +60,11 @@ func (st *state) shipFuncs(fm template.FuncMap) {
 		// This is lazy
 		return strings.TrimPrefix(s, "OBJ_SHIP_")
 	}
+	fm["countGuns"] = func(x xt.Ship) int {
+		n := 0
+		for i := range x.GunGroup {
+			n += x.GunGroup[i].NumGuns
+		}
+		return n
+	}
 }
