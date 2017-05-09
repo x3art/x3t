@@ -29,7 +29,6 @@ type state struct {
 
 var rootTemplates = map[string]string{
 	"/map":   "map",
-	"/ships": "ships",
 	"/about": "about",
 }
 
@@ -106,6 +105,7 @@ func main() {
 	}
 
 	http.HandleFunc("/ship/", st.ship)
+	http.HandleFunc("/ships", st.ships)
 	http.HandleFunc("/sector/", st.sector)
 
 	if staticDir, err := AssetDir("static"); err == nil {

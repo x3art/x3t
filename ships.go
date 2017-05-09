@@ -33,6 +33,21 @@ func (st *state) ship(w http.ResponseWriter, req *http.Request) {
 	http.NotFound(w, req)
 }
 
+type shipsReq struct {
+	Ships []*xt.Ship
+}
+
+func (st *state) ships(w http.ResponseWriter, req *http.Request) {
+	sr := shipsReq{}
+	for i := range st.Ships {
+		sr.Ships = append(sr.Ships, &st.Ships[i])
+	}
+	err := st.tmpl.ExecuteTemplate(w, "ships", st)
+	if err != nil {
+		log.Print(err)
+	}
+}
+
 var cockpitPos = []string{
 	"",
 	"Front",
@@ -57,8 +72,11 @@ func (st *state) shipFuncs(fm template.FuncMap) {
 		return cockpitPos[p]
 	}
 	fm["shipClassName"] = func(s string) string {
-		// This is lazy
-		return strings.TrimPrefix(s, "OBJ_SHIP_")
+		if strings.HasPrefix(s, "OBJ_SHIP_") {
+			// This is lazy
+			return strings.TrimPrefix(s, "OBJ_SHIP_")
+		}
+		return "special"
 	}
 	fm["countGuns"] = func(x xt.Ship) int {
 		n := 0
