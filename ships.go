@@ -56,4 +56,8 @@ func (st *state) shipFuncs(fm template.FuncMap) {
 	fm["cockpitPos"] = func(p int) string {
 		return cockpitPos[p]
 	}
+	fm["shipClassName"] = func(s string) string {
+		// This is lazy
+		return strings.TrimPrefix(s, "OBJ_SHIP_")
+	}
 }
