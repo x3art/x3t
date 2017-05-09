@@ -32,6 +32,7 @@ var rootTemplates = map[string]string{
 	"/about": "about",
 }
 
+// rpn calculator for templates
 func calc(vals ...interface{}) (int, error) {
 	s := make([]int, 0)
 	for _, vi := range vals {
@@ -65,6 +66,8 @@ func calc(vals ...interface{}) (int, error) {
 	}
 	return s[0], nil
 }
+
+var listen = flag.String("listen", "localhost:8080", "listen host:port for the http server")
 
 func main() {
 	flag.Parse()
@@ -136,5 +139,5 @@ func main() {
 	})
 
 	log.Printf("now")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(*listen, nil))
 }
