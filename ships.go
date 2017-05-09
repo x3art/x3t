@@ -37,12 +37,87 @@ type shipsReq struct {
 	Ships []*xt.Ship
 }
 
+type shipFilter interface {
+	Match(*xt.Ship) bool
+}
+
+type sfClass string
+
+func (c sfClass) Match(s *xt.Ship) bool {
+	return s.ClassDescription == string(c) || s.ClassDescription == "OBJ_SHIP_"+string(c)
+}
+
+func sfClassInit(s string) shipFilter {
+	return sfClass(s)
+}
+
+type sfUnion []shipFilter
+
+func (u sfUnion) Match(s *xt.Ship) bool {
+	for _, m := range u {
+		if m.Match(s) {
+			return true
+		}
+	}
+	return false
+}
+
+type sfIntersection []shipFilter
+
+func (i sfIntersection) Match(s *xt.Ship) bool {
+	for _, m := range i {
+		if !m.Match(s) {
+			return false
+		}
+	}
+	return true
+}
+
+type sfTrue struct{}
+
+func (_ sfTrue) Match(s *xt.Ship) bool {
+	return true
+}
+
+type sfInit func(string) shipFilter
+
+var shipFilters = map[string]sfInit{
+	"class": sfClassInit,
+}
+
 func (st *state) ships(w http.ResponseWriter, req *http.Request) {
+	q := req.URL.Query()
+
+	inter := sfIntersection{}
+
+	// In a query like: /ships?foo=1&foo=2&bar=2 each of the
+	// repeated queries (foo in this case) are in a union (OR) and
+	// each uniqe query (foo,bar) is in an intersection.
+	for qfilter, vals := range q {
+		if sfinit, ok := shipFilters[qfilter]; ok {
+			// If this was written for performance we'd
+			// not create the union and intersection if
+			// not necessary, but it isn't, so we won't
+			// bother. Amusingly enough this comment is
+			// longer than the code required.
+			un := sfUnion{}
+			for i := range vals {
+				un = append(un, sfinit(vals[i]))
+			}
+			inter = append(inter, un)
+		} else {
+			http.NotFound(w, req)
+		}
+	}
+
 	sr := shipsReq{}
 	for i := range st.Ships {
-		sr.Ships = append(sr.Ships, &st.Ships[i])
+		s := &st.Ships[i]
+		if inter.Match(s) {
+			sr.Ships = append(sr.Ships, s)
+		}
 	}
-	err := st.tmpl.ExecuteTemplate(w, "ships", st)
+	err := st.tmpl.ExecuteTemplate(w, "ships", sr)
 	if err != nil {
 		log.Print(err)
 	}
