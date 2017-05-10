@@ -257,3 +257,7 @@ in a form.
 
  - Render ship models with WebGL? Because why not. Shouldn't be that
    hard. I want to poke at WebGL some time anyway.
+
+ - Rename the whole thing. x3t? What did this even mean? I think it
+   was just a random directory name I had because I wanted to parse
+   TShips.txt, so the letter "t" made the most sense.
