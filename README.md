@@ -89,31 +89,35 @@ The layout of the source tree:
    (it's 0.5s right now which is way too slow, but I can't make it
    better without putting an unreasonable amount effort into it).
 
- * xt/ - package for accessing x3 data. Undocumented and testless. Can
-   only read the files.  Write support won't happen until someone
-   explains to me what the actual rules are for scrambling the various
-   gzip files. Currently I just calculate the xor cookies on the fly.
-   Ask me if you want to understand what's going on under the hood and
-   how to change stuff. There's a lot of interesting stuff going on
-   here and it was quite fun to write.
+ * xt/ - Package for accessing x3 data. Can only read the files.
+   Write support won't happen until someone explains to me what the
+   actual rules are for scrambling the various gzip files. Currently I
+   just calculate the xor cookies on the fly.  There's a lot of
+   interesting stuff going on here and it was quite fun to
+   write. Undocumented and testless. I pretty much don't want to
+   include tests because that would require dropping game files into
+   the repository and I'm pretty sure Egosoft would have opinions
+   about that (correctly, I may add). I already cleaned up the repo
+   from earlier test data that shouldn't be published.
 
-   * xt/x.go - container to access everything from one x3 installation
+   * xt/x.go - Container to access everything from an x3 installation.
 
-   * xt/xfiles.go - decoding of cat/dat files, decoding of pck files and
+   * xt/xfiles.go - Decoding of cat/dat files, decoding of pck files and
      rules for which files override what (as I understand them).
 
-   * xt/text.go - access to `t/` text files. I have no idea if I followed
+   * xt/text.go - Access to `t/` text files. I have no idea if I followed
      the official rules, but it seems to work and I'm not getting any
      missing strings.
 
-   * xt/tparse.go - parser primarily for `types/*.txt` should be fixed up
-     for other files with a similar format.
+   * xt/tparse.go - Parser for `types/*.txt`. Should be fixed up for
+     other files with a similar format. Right now it pretends that
+     we're dealing with csv files which we aren't.
 
-   * xt/types.go - structures to contain parsed data from `types/`.
+   * xt/types.go - Structures to contain parsed data from `types/`.
 
-   * xt/universe.go - parser and data structures for x3_universe.xml.
+   * xt/universe.go - Parser and data structures for `x3_universe.xml`.
 
-   * xt/extra.go - dumping ground for hardcoded things I couldn't
+   * xt/extra.go - Dumping ground for hardcoded things I couldn't
      figure out how to extract from the game files.
 
  * icons/ - material.io icons for the map. No longer used (they are
