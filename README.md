@@ -33,7 +33,7 @@ and type something like this:
       c:\whereever\you\installed\this\x3t.exe "c:\whereever\you\installed\x3"
 
 Then you take your browser (on the same machine) and go to
-http://localhost:8080/
+[http://localhost:8080/map](http://localhost:8080/map) or [http://localhost:8080/ships](http://localhost:8080/ships)
 
 That's it.
 
