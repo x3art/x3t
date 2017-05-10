@@ -144,22 +144,22 @@ The layout of the source tree:
    some style images.
 
   * assets/templates - templates for the various pages. They are all
-   standard go html/template.
+    standard go html/template.
 
-   * all - header and footer for all pages
+    * all - header and footer for all pages
 
-   * about - dumping ground for licenses and such
+    * about - dumping ground for licenses and such
 
-   * map - the map. What you get when you point your browser to `/map`
+    * map - the map. What you get when you point your browser to `/map`
 
-   * map-sector - one sector of the map (the square and all the stuff
+    * map-sector - one sector of the map (the square and all the stuff
      in it).
 
-   * sector - What you get when you point your browser to `/sector/x/y`
+    * sector - What you get when you point your browser to `/sector/x/y`
 
-   * ship - What you get at `/ship/Name`
+    * ship - What you get at `/ship/Name`
 
-   * ships - cat pictures
+    * ships - cat pictures
 
 ## template funcs ##
 
