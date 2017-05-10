@@ -195,4 +195,10 @@ func (st *state) shipFuncs(fm template.FuncMap) {
 	fm["raceList"] = func() []int {
 		return []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 19}
 	}
+	fm["shieldStr"] = func(s *xt.Ship) int {
+		if s.ShieldType == nil {
+			return 0
+		}
+		return s.ShieldType.Strength * s.MaxShieldCount / 1000
+	}
 }

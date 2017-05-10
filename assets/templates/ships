@@ -33,7 +33,7 @@ Race:
     <td><a href="/ship/{{.Description}}{{if .Variation}}/{{.Variation}}{{end}}">{{.Description}} {{.Variation}}</a></td>
     <td><a href="/ships?class={{shipClassName .ClassDescription}}">{{shipClassName .ClassDescription}}</a></td>
     <td><a href="/ships?race={{.Race}}">{{raceName .Race}}</a></td>
-    <td>{{calc .ShieldType.Strength .MaxShieldCount "*" 1000 "/"}}</td>
+    <td>{{shieldStr .}}</td>
     <td>{{.CargoMax}}</td>
     <td>{{countGuns .}}</td>
    </tr>

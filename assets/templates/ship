@@ -2,7 +2,7 @@
   {{.Description}} {{.Variation}}<br/>
   Class: {{shipClassName .ClassDescription}}<br />
   Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
-  Shield: {{calc .ShieldType.Strength .MaxShieldCount "*" 1000 "/"}} MJ
+  Shield: {{shieldStr .}} MJ
   Race: {{raceName .Race}}
   <ul> Lasers
 {{- $ship := .}}

@@ -24,6 +24,9 @@ func (x *X) typeLookup(typ string, value string, index bool) (reflect.Value, err
 		if err != nil {
 			return reflect.Value{}, err
 		}
+		if i < 0 {
+			return reflect.Zero(reflect.ValueOf(t).Index(0).Addr().Type()), nil
+		}
 		return reflect.ValueOf(t).Index(i).Addr(), nil
 	}
 	return reflect.Value{}, fmt.Errorf("not implemented")
