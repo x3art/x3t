@@ -78,6 +78,7 @@ var pckMap = map[string]string{
 	// XXX - no idea about the directories below, just shut up the warning for now.
 	"v":         "wtf",
 	"cutscenes": "wtf",
+	"mov":	     "mov",
 	".":         "wtf",
 }
 
