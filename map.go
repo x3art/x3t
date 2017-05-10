@@ -40,49 +40,10 @@ func (st *state) sector(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (st *state) sunPercent(s xt.Sector) int {
-	x := 0
-	for i := range s.Suns {
-		x += st.Suns[s.Suns[i].S].Brightness
-	}
-	return x * 100 / 65536
-}
-
 func (st *state) mapFuncs(fm template.FuncMap) {
-	// XXX - clean this up, half of this doesn't belong here.
-	fm["sectName"] = func(s *xt.Sector) string {
-		return s.Name(st.x.GetText())
-	}
-	fm["raceName"] = func(r int) string {
-		switch r {
-		case 1:
-			return "Argon"
-		case 2:
-			return "Boron"
-		case 3:
-			return "Split"
-		case 4:
-			return "Paranid"
-		case 5:
-			return "Teladi"
-		case 6:
-			return "Xenon"
-		case 7:
-			return "Kha'ak"
-		case 8:
-			return "Pirates"
-		case 9:
-			return "Goner"
-		case 17:
-			return "ATF"
-		case 18:
-			return "Terran"
-		case 19:
-			return "Yaki"
-		default:
-			return "Unknown"
-		}
-	}
+	fm["SectorName"] = st.x.SectorName
+	fm["SectorFlavor"] = st.x.SectorFlavor
+	fm["raceName"] = st.x.RaceName
 	fm["lnBreak"] = func(maxl int, s string) []string {
 		ret := make([]string, 0)
 		for _, e := range strings.Split(s, " ") {
@@ -95,9 +56,9 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 		}
 		return ret
 	}
-	fm["sectorIcons"] = func(s xt.Sector) []string {
+	fm["sectorIcons"] = func(s *xt.Sector) []string {
 		ret := []string{}
-		if st.sunPercent(s) > 150 {
+		if st.x.SunPercent(s) > 150 {
 			ret = append(ret, "sunny")
 		}
 		sil, ore := 0, 0
@@ -137,19 +98,6 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 			return false
 		}
 	}
-	fm["asteroidType"] = func(i int) string {
-		switch i {
-		case 0:
-			return "Ore"
-		case 1:
-			return "Silicon Wafers"
-		case 2:
-			return "Nividium"
-		case 3:
-			return "Ice"
-		default:
-			return "Unknown"
-		}
-	}
-	fm["sunPercent"] = st.sunPercent
+	fm["asteroidType"] = st.x.AsteroidType
+	fm["sunPercent"] = st.x.SunPercent
 }

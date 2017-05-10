@@ -31,11 +31,6 @@ type Sector struct {
 	Specials   []Special  `x3t:"ot:20"`
 }
 
-func (s *Sector) Name(text Text) string {
-	r, _ := text.Get(7, 1020000+100*(s.Y+1)+(s.X+1))
-	return r
-}
-
 type pos struct {
 	X int `x3t:"o:x"`
 	Y int `x3t:"o:y"`

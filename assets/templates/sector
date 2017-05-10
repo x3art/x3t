@@ -1,7 +1,8 @@
 {{template "header"}}
-  Sector: {{sectName .S}}<br />
+  Sector: {{SectorName .S}}<br />
   Race: {{raceName .S.R}}<br />
   Suns: {{sunPercent .S}}%<br />
+  Description: {{SectorFlavor .S}}<br />
   {{- $st := .St}}
   {{- with .S.Gates}}
   <ul>Gates:
@@ -9,7 +10,7 @@
     {{- if validGate .}}
      {{- $dir := (index "NSWE" .Gid)}}
      {{- with ($st.U.SectorXY .Gx .Gy)}}
-      <li> {{printf "%c" $dir}} - <a href="/sector/{{.X}}/{{.Y}}">{{sectName .}}</a>
+      <li> {{printf "%c" $dir}} - <a href="/sector/{{.X}}/{{.Y}}">{{SectorName .}}</a>
      {{- end}}
     {{- end}}
    {{- end}}
