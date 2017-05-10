@@ -26,9 +26,13 @@ type Sector struct {
 	Planets    []Planet   `x3t:"ot:4"`
 	Docks      []Dock     `x3t:"ot:5"`
 	Factories  []Factory  `x3t:"ot:6"`
-	Gates      []Gate     `x3t:"ot:18"`
 	Ships      []UShip    `x3t:"ot:7"`
+	Missiles   []Ware     `x3t:"ot:10"`
+	Food       []Ware     `x3t:"ot:14"`
+	Tech 	   []Ware     `x3t:"ot:16"`
+	Gates      []Gate     `x3t:"ot:18"`
 	Specials   []Special  `x3t:"ot:20"`
+	Debris	   []Debris   `x3t:"ot:28"`
 }
 
 type pos struct {
@@ -98,7 +102,11 @@ type Dock struct {
 
 type Factory struct {
 	S string `x3t:"o:s"`
+	Docks      []Dock     `x3t:"ot:5"`	// Huh?
+	Factories  []Factory  `x3t:"ot:6"`	// Huh?
+	Ships      []UShip    `x3t:"ot:7"`
 	station
+	N string `x3t:"o:n"`
 }
 
 type Gate struct {
@@ -124,6 +132,8 @@ type UShip struct { // Name conflict, sigh.
 	F int    `x3t:"o:f"`
 	pos
 	race
+	Ships      []UShip    `x3t:"ot:7"`
+	CCs []CustomisableContainer `x3t:"ot:23"`
 }
 
 type Special struct {
@@ -132,10 +142,14 @@ type Special struct {
 	pos
 	rot
 	V int `x3t:"o:v"`
+	F int    `x3t:"o:f"`
 }
 
 type CustomisableContainer struct {
 	S        int    `x3t:"o:s"`
+	Docks      []Dock     `x3t:"ot:5"`	//huh?
+	Factories  []Factory  `x3t:"ot:6"`	//huh?
+	Ships      []UShip    `x3t:"ot:7"`
 	Lasers   []Ware `x3t:"ot:8"`
 	Shields  []Ware `x3t:"ot:9"`
 	Missiles []Ware `x3t:"ot:10"`
@@ -156,8 +170,22 @@ type Ware struct {
 	N int `x3t:"o:n"`
 }
 
+type Debris struct {
+	id
+	S int `x3t:"o:s"`
+	pos
+	rot
+     	Type   int `x3t:"o:atype"` // 0 - ore, 1 - silicon, 2 - nividium, 3 - ice
+	Amount int `x3t:"o:aamount"`
+	F      int `x3t:"o:f"`
+}
+
 type Universe struct {
-	Sectors []Sector `x3t:"ot:1"`
+	Sectors  []Sector `x3t:"ot:1"`
+	Debris	 []Debris   `x3t:"ot:28"`
+	Specials []Special  `x3t:"ot:20"`
+	Factories  []Factory  `x3t:"ot:6"`
+	Docks      []Dock     `x3t:"ot:5"`
 }
 
 func t(attrs []xml.Attr) int {
@@ -187,11 +215,14 @@ type odecoder struct {
 }
 
 func (dec *odecoder) complain(st reflect.Type, ot int) {
+	if dec.complaints == nil {
+		dec.complaints = make(map[int]bool)
+	}
 	if dec.complaints[ot] {
 		return
 	}
 	dec.complaints[ot] = true
-	log.Printf("struct %v should hande ot: %d\n", st, ot)
+	log.Printf("struct %v should handle ot: %d\n", st, ot)
 }
 
 func (dec *odecoder) embed(t reflect.Type, index []int) {
