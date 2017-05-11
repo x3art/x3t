@@ -105,10 +105,25 @@ func sfSpeedInit(s string) shipFilter {
 	return sfSpeed(x)
 }
 
+type sfShields int
+
+func (sh sfShields) Match(s *xt.Ship) bool {
+	return xt.ShipShieldStr(s) >= int(sh)
+}
+
+func sfShieldsInit(s string) shipFilter {
+	x, err := strconv.Atoi(s)
+	if err != nil {
+		return nil
+	}
+	return sfShields(x)
+}
+
 var shipFilters = map[string]sfInit{
 	"class":       sfClassInit,
 	"race":        sfRaceInit,
 	"minMaxSpeed": sfSpeedInit,
+	"minShields":  sfShieldsInit,
 }
 
 type shipsReq struct {
@@ -212,11 +227,6 @@ func (st *state) shipFuncs(fm template.FuncMap) {
 	fm["raceList"] = func() []int {
 		return []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 19}
 	}
-	fm["shieldStr"] = func(s *xt.Ship) int {
-		if s.ShieldType == nil {
-			return 0
-		}
-		return s.ShieldType.Strength * s.MaxShieldCount / 1000
-	}
+	fm["shieldStr"] = xt.ShipShieldStr
 	fm["ShipSpeedMax"] = xt.ShipSpeedMax
 }

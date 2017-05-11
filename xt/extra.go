@@ -120,3 +120,11 @@ func ShipSpeedMax(s *Ship) int {
 	// I haven't been able to find any documentation for the calcuation below, but it seems to work.
 	return (s.Speed + s.Speed*s.MaxEngineTuning/10) / 500
 }
+
+// Shield strength in MJ
+func ShipShieldStr(s *Ship) int {
+	if s.ShieldType == nil {
+		return 0
+	}
+	return s.ShieldType.Strength * s.MaxShieldCount / 1000
+}
