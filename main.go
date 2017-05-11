@@ -63,6 +63,43 @@ func calc(vals ...interface{}) (int, error) {
 	return s[0], nil
 }
 
+// rpn calculator for templates, floating point
+func calcf(vals ...interface{}) (float64, error) {
+	s := make([]float64, 0)
+	for _, vi := range vals {
+		switch v := vi.(type) {
+		case int:
+			s = append(s, float64(v))
+		case float64:
+			s = append(s, v)
+		case string:
+			l := len(s)
+			if l < 2 {
+				return 0, fmt.Errorf("calc stack underflow")
+			}
+			a, b := s[l-2], s[l-1]
+			s = s[:l-1]
+			r := &s[l-2]
+			switch v {
+			case "+":
+				*r = a + b
+			case "-":
+				*r = a - b
+			case "*":
+				*r = a * b
+			case "/":
+				*r = a / b
+			}
+		default:
+			return 0, fmt.Errorf("bad type %v", vi)
+		}
+	}
+	if len(s) != 1 {
+		return 0, fmt.Errorf("calcf stack overflow")
+	}
+	return s[0], nil
+}
+
 var listen = flag.String("listen", "localhost:8080", "listen host:port for the http server")
 
 func main() {
@@ -77,6 +114,7 @@ func main() {
 	// Register various template funcs that we need.
 	fm := make(template.FuncMap)
 	fm["calc"] = calc
+	fm["calcf"] = calcf
 	st.mapFuncs(fm)
 	st.shipFuncs(fm)
 	st.tmpl.Funcs(fm)
