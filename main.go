@@ -19,12 +19,9 @@ import (
 )
 
 type state struct {
-	x     *xt.X
-	Ships []xt.Ship
-	Docks map[string]xt.TDock
-	Suns  []xt.TSun
-	U     xt.Universe
-	tmpl  *template.Template
+	x    *xt.X
+	U    xt.Universe
+	tmpl *template.Template
 }
 
 var rootTemplates = map[string]string{
@@ -75,12 +72,7 @@ func main() {
 	st := state{}
 
 	st.x = xt.NewX(flag.Arg(0))
-
-	st.Ships = st.x.GetShips()
-	st.Docks = st.x.GetDocks()
-	st.Suns = st.x.GetSuns()
 	st.U = st.x.GetUniverse()
-
 	st.tmpl = template.New("")
 
 	// Register various template funcs that we need.

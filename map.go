@@ -76,10 +76,11 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 		if ore > 600 {
 			ret = append(ret, "ore")
 		}
+		tdocks := st.x.GetDocks()
 		for i := range s.Docks {
 			// Stab in the dark, but it matches some
 			// equipment docks and military outposts.
-			if st.Docks[s.Docks[i].S].GalaxySubtype == "SG_DOCK_EQUIP" {
+			if tdocks[s.Docks[i].S].GalaxySubtype == "SG_DOCK_EQUIP" {
 				ret = append(ret, "dock")
 				break
 			}

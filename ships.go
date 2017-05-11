@@ -11,6 +11,7 @@ import (
 )
 
 func (st *state) ship(w http.ResponseWriter, req *http.Request) {
+	ships := st.x.GetShips()
 	s := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/ship/"), "/", 2)
 	var name, variation string
 
@@ -22,9 +23,9 @@ func (st *state) ship(w http.ResponseWriter, req *http.Request) {
 		variation = s[1]
 	}
 
-	for i := range st.Ships {
-		if st.Ships[i].Description == name && st.Ships[i].Variation == variation {
-			err := st.tmpl.ExecuteTemplate(w, "ship", st.Ships[i])
+	for i := range ships {
+		if ships[i].Description == name && ships[i].Variation == variation {
+			err := st.tmpl.ExecuteTemplate(w, "ship", &ships[i])
 			if err != nil {
 				log.Print(err)
 			}
@@ -101,6 +102,7 @@ type shipsReq struct {
 }
 
 func (st *state) ships(w http.ResponseWriter, req *http.Request) {
+	ships := st.x.GetShips()
 	q := req.URL.Query()
 
 	inter := sfIntersection{}
@@ -132,8 +134,8 @@ func (st *state) ships(w http.ResponseWriter, req *http.Request) {
 	}
 
 	sr := shipsReq{Q: q}
-	for i := range st.Ships {
-		s := &st.Ships[i]
+	for i := range ships {
+		s := &ships[i]
 		if inter.Match(s) {
 			sr.Ships = append(sr.Ships, s)
 		}
