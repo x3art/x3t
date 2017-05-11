@@ -3,13 +3,13 @@
   Race: {{raceName .S.R}}<br />
   Suns: {{sunPercent .S}}%<br />
   Description: {{SectorFlavor .S}}<br />
-  {{- $st := .St}}
+  {{- $r := . }}
   {{- with .S.Gates}}
   <ul>Gates:
    {{- range .}}
     {{- if validGate .}}
      {{- $dir := (index "NSWE" .Gid)}}
-     {{- with ($st.U.SectorXY .Gx .Gy)}}
+     {{- with ($r.U.SectorXY .Gx .Gy)}}
       <li> {{printf "%c" $dir}} - <a href="/sector/{{.X}}/{{.Y}}">{{SectorName .}}</a>
      {{- end}}
     {{- end}}
@@ -19,7 +19,7 @@
   {{- with .S.Docks}}
    <ul>Docks:
     {{- range .}}
-     {{- $d := (index $st.Docks .S)}}
+     {{- $d := (index $r.Docks .S)}}
      <li> {{ $d.Description }}
     {{- end}}
    </ul>

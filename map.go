@@ -10,8 +10,9 @@ import (
 )
 
 type sectorReq struct {
-	St *state
-	S  *xt.Sector
+	U     xt.Universe
+	Docks map[string]xt.TDock
+	S     *xt.Sector
 }
 
 func (st *state) sector(w http.ResponseWriter, req *http.Request) {
@@ -30,11 +31,12 @@ func (st *state) sector(w http.ResponseWriter, req *http.Request) {
 		http.NotFound(w, req)
 		return
 	}
-	sect := st.U.SectorXY(x, y)
+	u := st.x.GetUniverse()
+	sect := u.SectorXY(x, y)
 	if sect == nil {
 		http.NotFound(w, req)
 	}
-	err = st.tmpl.ExecuteTemplate(w, "sector", sectorReq{st, sect})
+	err = st.tmpl.ExecuteTemplate(w, "sector", sectorReq{u, st.x.GetDocks(), sect})
 	if err != nil {
 		log.Print(err)
 	}

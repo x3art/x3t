@@ -134,7 +134,7 @@
 			}
 		</style>
 		<g>
-{{- range .U.Sectors}}
+{{- range (.GetUniverse).Sectors}}
 {{template "map-sector" .}}
 {{- end}}
 		</g>

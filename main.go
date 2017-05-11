@@ -20,7 +20,6 @@ import (
 
 type state struct {
 	x    *xt.X
-	U    xt.Universe
 	tmpl *template.Template
 }
 
@@ -72,7 +71,6 @@ func main() {
 	st := state{}
 
 	st.x = xt.NewX(flag.Arg(0))
-	st.U = st.x.GetUniverse()
 	st.tmpl = template.New("")
 
 	// Register various template funcs that we need.
@@ -92,7 +90,7 @@ func main() {
 	for n := range rootTemplates {
 		t := rootTemplates[n]
 		http.HandleFunc(n, func(w http.ResponseWriter, req *http.Request) {
-			err := st.tmpl.ExecuteTemplate(w, t, st)
+			err := st.tmpl.ExecuteTemplate(w, t, st.x)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -130,6 +128,6 @@ func main() {
 		http.ServeContent(w, req, "/foo.png", time.Time{}, bytes.NewReader(b.Bytes()))
 	})
 
-	log.Printf("now")
+	log.Print("now")
 	log.Fatal(http.ListenAndServe(*listen, nil))
 }
