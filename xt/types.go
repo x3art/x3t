@@ -23,6 +23,7 @@ var typeMap = map[string]struct {
 	"Cockpits": {"addon/types/TCockpits.txt", reflect.TypeOf(Cockpit{})},
 	"Lasers":   {"addon/types/TLaser.txt", reflect.TypeOf(TLaser{})},
 	"Docks":    {"addon/types/TDocks.txt", reflect.TypeOf(TDock{})},
+	"Bullets":  {"addon/types/TBullets.txt", reflect.TypeOf(TBullet{})},
 }
 
 func (x *X) typeLookup(typ string, value string, index bool) (reflect.Value, error) {
@@ -284,9 +285,9 @@ type TLaser struct {
 	RotZ                   float64
 	Index                  string
 	Description            string `x3t:"page:17"`
-	RoF                    int
+	RoF                    int    // 1 shot per RoF milliseconds
 	Sound                  int
-	Projectile             int
+	Projectile             *TBullet `x3t:"tref:Bullets,index"`
 	Energy                 int
 	ChargeRate             float64
 	HUDIcon                string
@@ -319,6 +320,58 @@ type TShield struct {
 	HitEffect              string
 	Efficiency             string
 	Volume                 string
+	ProductionRelValNPC    int
+	PriceModifier1         int
+	PriceModifier2         int
+	WareClass              int
+	ProductionRelValPlayer int
+	MinNotoriety           int
+	VideoID                string
+	Skin                   string
+	ObjectID               string
+}
+
+type TBullet struct {
+	BodyFile               string
+	PictureID              string
+	Yaw                    float64
+	Pitch                  float64
+	Roll                   float64
+	Index                  string
+	Description            string `x3t:"page:17"`
+	ShieldDamage           int
+	EnergyUsed             int
+	Sound                  string // index to Sounds.txt
+	Lifetime               int
+	Speed                  int
+	Flags                  int
+	ColorB                 int
+	ColorG                 int
+	ColorR                 int
+	SizeX                  float64
+	SizeY                  float64
+	SizeZ                  float64
+	EngineEffect           string // Effects.txt
+	ImpactEffect           string // Effects.txt
+	LauchEffect            string // Effects.txt
+	HullDamage             int
+	EngineTrail            string
+	AmbientSound           string // Sounds.txt
+	VolumeMin              int
+	VolumeMax              int
+	Unknown1               int
+	Unknown2               int
+	Unknown3               int
+	Unknown4               int
+	Unknown5               int
+	Unknown6               int
+	Unknown7               int
+	Unknown8               int
+	Unknown9               int
+	Unknown10              int
+	Unknown11              int
+	Unknown12              int
+	Ammo                   string // TWareT.txt (or 128?)
 	ProductionRelValNPC    int
 	PriceModifier1         int
 	PriceModifier2         int
