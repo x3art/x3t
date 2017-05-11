@@ -102,7 +102,7 @@ type Ship struct {
 	// Class - ship class. Names of classes can be changed but classes itself are hardcoded into OBJ files
 	Class        string
 	Description  string `x3t:"page:17"`
-	Speed        int
+	Speed        int    // Seems to be scaled by 500.
 	Acceleration int
 	// Engine sound - Index to Sounds.txt
 	EngineSound          string
@@ -134,10 +134,8 @@ type Ship struct {
 	PossibleMissiles int
 	// Number of missiles (NPC) - Maximum number of missiles an NPC ship can carry
 	NumberOfMissiles int
-	// Max # of engine tunning
-	MaxEngineTuning int
-	// Max # of rudder tunning
-	MaxRudderTuning int
+	MaxEngineTuning  int // One engine tuning seems to increase the speed by 10% of the minimum speed.
+	MaxRudderTuning  int
 	// Cargo min (buy) - minimum cargo capacity (when the ship is bought)
 	CargoMin int
 	// Cargo max - maximum cargo capacity

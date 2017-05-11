@@ -91,9 +91,24 @@ func sfRaceInit(s string) shipFilter {
 	return sfRace(x)
 }
 
+type sfSpeed int
+
+func (sp sfSpeed) Match(s *xt.Ship) bool {
+	return xt.ShipSpeedMax(s) >= int(sp)
+}
+
+func sfSpeedInit(s string) shipFilter {
+	x, err := strconv.Atoi(s)
+	if err != nil {
+		return nil
+	}
+	return sfSpeed(x)
+}
+
 var shipFilters = map[string]sfInit{
-	"class": sfClassInit,
-	"race":  sfRaceInit,
+	"class":       sfClassInit,
+	"race":        sfRaceInit,
+	"minMaxSpeed": sfSpeedInit,
 }
 
 type shipsReq struct {
@@ -203,4 +218,5 @@ func (st *state) shipFuncs(fm template.FuncMap) {
 		}
 		return s.ShieldType.Strength * s.MaxShieldCount / 1000
 	}
+	fm["ShipSpeedMax"] = xt.ShipSpeedMax
 }

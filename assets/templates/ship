@@ -1,9 +1,10 @@
 {{template "header"}}
   {{.Description}} {{.Variation}}<br/>
   Class: {{shipClassName .ClassDescription}}<br />
+  Race: {{raceName .Race}}<br />
   Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
-  Shield: {{shieldStr .}} MJ
-  Race: {{raceName .Race}}
+  Shield: {{shieldStr .}} MJ<br />
+  Speed: {{calc .Speed 500 "/"}} - {{ShipSpeedMax .}}<br />
   <ul> Lasers
 {{- $ship := .}}
 {{- with maskToLasers .PossibleLasers $ship.WareClass}}

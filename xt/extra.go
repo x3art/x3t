@@ -115,3 +115,8 @@ func (x *X) SunPercent(s *Sector) int {
 	}
 	return b * 100 / 65536
 }
+
+func ShipSpeedMax(s *Ship) int {
+	// I haven't been able to find any documentation for the calcuation below, but it seems to work.
+	return (s.Speed + s.Speed*s.MaxEngineTuning/10) / 500
+}
