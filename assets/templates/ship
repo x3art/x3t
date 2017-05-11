@@ -5,26 +5,40 @@
   Cargo: {{.CargoMin}} - {{.CargoMax}}<br/>
   Shield: {{shieldStr .}} MJ<br />
   Speed: {{calc .Speed 500 "/"}} - {{ShipSpeedMax .}}<br />
-  <ul> Lasers
+  Hull strength: {{.HullStrength}}<br />
+  Weapon energy: {{.WeaponsEnergy}} MJ (+{{calcf .WeaponsEnergy .WeaponsRechargeRate "*"}}MW)
+  Lasers:<br />
+  <table>
+   <thead>
+    <tr>
+     <th>Name</th>
+     <th>RoF</th>
+     <th>Shield dps</th>
+     <th>Hull dps</th>
+    </tr>
+   </thead>
+   <tbody>
 {{- $ship := .}}
 {{- with maskToLasers .PossibleLasers $ship.CargoType}}
-   <li>  Main: {{ (index $ship.GunGroup 0).NumGuns }}
-     <ul>
+    <tr><td colspan="2">Main x{{ (index $ship.GunGroup 0).NumGuns }}</td></tr>
  {{- range .}}
-      <li> {{.Description}}
+  {{- block "laser" .}}
+    <tr>
+     <td>{{.Description}}</td>
+     <td>{{.RoF}}</td>
+     <td>{{calcf .Projectile.ShieldDamage 1000 "*" .RoF "/"}}</td>
+     <td>{{calcf .Projectile.HullDamage 1000 "*" .RoF "/"}}</td>
+    </tr>
+  {{- end}}
  {{- end}}
-     </ul>
 {{- end}}
 {{- range $index, $td := .TurretDescriptor}}
  {{- $pos := .CPos}}
  {{- with maskToLasers .Cockpit.LaserMask $ship.CargoType}}
-   <li>  {{ cockpitPos $pos }} {{ (index $ship.GunGroup (calc $index 1 "+")).NumGuns }}
-     <ul>
-  {{- range . }}
-      <li> {{.Description}}
-  {{- end}}
-     </ul>
+   <tr><td colspan="2">{{ cockpitPos $pos }} x{{ (index $ship.GunGroup (calc $index 1 "+")).NumGuns }}</td></tr>
+  {{- range . }}{{template "laser" .}}{{end}}
  {{- end}}
 {{- end}}
-  </ul>
+   </tbody>
+  </table>
 {{template "footer"}}
