@@ -1,30 +1,29 @@
 {{template "header"}}
-  Sector: {{SectorName .S}}<br />
-  Race: {{raceName .S.R}}<br />
-  Suns: {{sunPercent .S}}%<br />
-  Description: {{SectorFlavor .S}}<br />
-  {{- $r := . }}
-  {{- with .S.Gates}}
+  Sector: {{SectorName .}}<br />
+  Race: {{raceName .R}}<br />
+  Suns: {{sunPercent .}}%<br />
+  Description: {{SectorFlavor .}}<br />
+  {{- with .Gates}}
   <ul>Gates:
    {{- range .}}
     {{- if validGate .}}
      {{- $dir := (index "NSWE" .Gid)}}
-     {{- with ($r.U.SectorXY .Gx .Gy)}}
+     {{- with (SectorXY .Gx .Gy)}}
       <li> {{printf "%c" $dir}} - <a href="/sector/{{.X}}/{{.Y}}">{{SectorName .}}</a>
      {{- end}}
     {{- end}}
    {{- end}}
   </ul>
   {{- end}}
-  {{- with .S.Docks}}
+  {{- with .Docks}}
    <ul>Docks:
     {{- range .}}
-     {{- $d := (index $r.Docks .S)}}
+     {{- $d := (DockByID .S)}}
      <li> {{ $d.Description }}
     {{- end}}
    </ul>
   {{- end}}
-  {{- with .S.Asteroids}}
+  {{- with .Asteroids}}
    <ul>Asteroids:
     {{- range .}}
      <li> {{ asteroidType .Type }} - {{ .Amount }}

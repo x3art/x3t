@@ -9,12 +9,6 @@ import (
 	"x3t/xt"
 )
 
-type sectorReq struct {
-	U     xt.Universe
-	Docks map[string]*xt.TDock
-	S     *xt.Sector
-}
-
 func (st *state) sector(w http.ResponseWriter, req *http.Request) {
 	s := strings.Split(strings.TrimPrefix(req.URL.Path, "/sector/"), "/")
 	if len(s) != 2 {
@@ -36,7 +30,7 @@ func (st *state) sector(w http.ResponseWriter, req *http.Request) {
 	if sect == nil {
 		http.NotFound(w, req)
 	}
-	err = st.tmpl.ExecuteTemplate(w, "sector", sectorReq{u, st.x.GetDocks(), sect})
+	err = st.tmpl.ExecuteTemplate(w, "sector", sect)
 	if err != nil {
 		log.Print(err)
 	}
@@ -102,4 +96,8 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 	}
 	fm["asteroidType"] = st.x.AsteroidType
 	fm["sunPercent"] = st.x.SunPercent
+	fm["DockByID"] = st.x.DockByID
+	fm["SectorXY"] = func(x, y int) *xt.Sector {
+		return st.x.GetUniverse().SectorXY(x, y)
+	}
 }
