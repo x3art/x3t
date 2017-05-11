@@ -152,7 +152,7 @@ type Ship struct {
 	// Docking slots - maximum number of ships which can dock
 	DockingSlots int
 	// Cargo type - maximum cargo size the ship can carry - Ware class of TWare.txts
-	CargoType string
+	CargoType int
 	// Race - Race of the ship.
 	Race         int
 	HullStrength int

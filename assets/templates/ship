@@ -7,7 +7,7 @@
   Speed: {{calc .Speed 500 "/"}} - {{ShipSpeedMax .}}<br />
   <ul> Lasers
 {{- $ship := .}}
-{{- with maskToLasers .PossibleLasers $ship.WareClass}}
+{{- with maskToLasers .PossibleLasers $ship.CargoType}}
    <li>  Main: {{ (index $ship.GunGroup 0).NumGuns }}
      <ul>
  {{- range .}}
@@ -17,7 +17,7 @@
 {{- end}}
 {{- range $index, $td := .TurretDescriptor}}
  {{- $pos := .CPos}}
- {{- with maskToLasers .Cockpit.LaserMask $ship.WareClass}}
+ {{- with maskToLasers .Cockpit.LaserMask $ship.CargoType}}
    <li>  {{ cockpitPos $pos }} {{ (index $ship.GunGroup (calc $index 1 "+")).NumGuns }}
      <ul>
   {{- range . }}
