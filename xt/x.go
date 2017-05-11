@@ -5,11 +5,6 @@ import (
 	"sync"
 )
 
-type typeCache struct {
-	once sync.Once
-	v    interface{}
-}
-
 // Each thing we access is loaded and parsed on demand. To synchronize
 // this, each member is protected by a sync.Once.
 type X struct {
@@ -19,7 +14,7 @@ type X struct {
 	text     Text
 
 	docksOnce sync.Once
-	docks     map[string]TDock
+	docks     map[string]*TDock
 
 	typeCache map[string]*typeCache
 
@@ -41,6 +36,7 @@ func (x *X) Open(f string) io.Reader {
 	return x.xf.Open(f)
 }
 
+// Asynchronously pre-cache everything we might want to load later.
 func (x *X) PreCache() {
 	go func() {
 		_ = x.GetUniverse()

@@ -11,7 +11,7 @@ import (
 
 type sectorReq struct {
 	U     xt.Universe
-	Docks map[string]xt.TDock
+	Docks map[string]*xt.TDock
 	S     *xt.Sector
 }
 
@@ -78,11 +78,10 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 		if ore > 600 {
 			ret = append(ret, "ore")
 		}
-		tdocks := st.x.GetDocks()
 		for i := range s.Docks {
 			// Stab in the dark, but it matches some
 			// equipment docks and military outposts.
-			if tdocks[s.Docks[i].S].GalaxySubtype == "SG_DOCK_EQUIP" {
+			if st.x.DockByID(s.Docks[i].S).GalaxySubtype == "SG_DOCK_EQUIP" {
 				ret = append(ret, "dock")
 				break
 			}

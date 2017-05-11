@@ -4,7 +4,13 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"sync"
 )
+
+type typeCache struct {
+	once sync.Once
+	v    interface{}
+}
 
 var typeMap = map[string]struct {
 	fn string
@@ -195,8 +201,7 @@ type Ship struct {
 	VideoID string
 	// Unknown value
 	UknownValue string
-	// Ship ID - identifier of the ship
-	ShipID string
+	ObjectID    string
 }
 
 type Cockpit struct {
@@ -221,15 +226,19 @@ type Cockpit struct {
 	ObjectID               string
 }
 
-func (x *X) GetDocks() map[string]TDock {
+func (x *X) DockByID(id string) *TDock {
+	return x.GetDocks()[id]
+}
+
+func (x *X) GetDocks() map[string]*TDock {
 	x.docksOnce.Do(func() {
 		f := x.xf.Open("addon/types/TDocks.txt")
 		defer f.Close()
 		ds := []TDock{}
 		x.tparse(f, &ds)
-		x.docks = make(map[string]TDock)
-		for _, d := range ds {
-			x.docks[d.ObjectID] = d
+		x.docks = make(map[string]*TDock)
+		for i := range ds {
+			x.docks[ds[i].ObjectID] = &ds[i]
 		}
 	})
 
