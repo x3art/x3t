@@ -40,3 +40,14 @@ func NewX(dir string) *X {
 func (x *X) Open(f string) io.Reader {
 	return x.xf.Open(f)
 }
+
+func (x *X) PreCache() {
+	go func() {
+		_ = x.GetUniverse()
+	}()
+	for tk := range x.typeCache {
+		go func() {
+			_ = x.getType(tk)
+		}()
+	}
+}

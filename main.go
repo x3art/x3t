@@ -71,6 +71,7 @@ func main() {
 	st := state{}
 
 	st.x = xt.NewX(flag.Arg(0))
+	st.x.PreCache()
 	st.tmpl = template.New("")
 
 	// Register various template funcs that we need.
