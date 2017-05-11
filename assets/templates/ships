@@ -12,8 +12,8 @@ Race:
 <input type="checkbox" name="race" value="{{.}}"{{if (isChecked $q "race" (print .))}} checked{{end}}>
 {{raceName .}}
 {{- end}}<br />
-Minimum max speed: <input type="number" name="minMaxSpeed" min="1" max="2500"><br />
-Minimum shields: <input type="number" name="minShields" min="1" max="500000"><br />
+Minimum max speed: <input type="number" name="minMaxSpeed" min="0" max="2500" value="0"><br />
+Minimum shields: <input type="number" name="minShields" min="0" max="500000" value="0"><br />
 <input type="submit" value="Submit">
 </form>
 </div>
