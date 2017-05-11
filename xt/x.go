@@ -13,9 +13,6 @@ type X struct {
 	textOnce sync.Once
 	text     Text
 
-	docksOnce sync.Once
-	docks     map[string]*TDock
-
 	typeCache map[string]*typeCache
 
 	universeOnce sync.Once

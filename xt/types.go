@@ -10,6 +10,7 @@ import (
 type typeCache struct {
 	once sync.Once
 	v    interface{}
+	byid map[string]interface{}
 }
 
 var typeMap = map[string]struct {
@@ -21,10 +22,11 @@ var typeMap = map[string]struct {
 	"Ships":    {"addon/types/TShips.txt", reflect.TypeOf(Ship{})},
 	"Cockpits": {"addon/types/TCockpits.txt", reflect.TypeOf(Cockpit{})},
 	"Lasers":   {"addon/types/TLaser.txt", reflect.TypeOf(TLaser{})},
+	"Docks":    {"addon/types/TDocks.txt", reflect.TypeOf(TDock{})},
 }
 
 func (x *X) typeLookup(typ string, value string, index bool) (reflect.Value, error) {
-	t := x.getType(typ)
+	t := x.getType(typ).v
 	if index {
 		i, err := strconv.Atoi(value)
 		if err != nil {
@@ -38,19 +40,30 @@ func (x *X) typeLookup(typ string, value string, index bool) (reflect.Value, err
 	return reflect.Value{}, fmt.Errorf("not implemented")
 }
 
-func (x *X) getType(t string) interface{} {
-	x.typeCache[t].once.Do(func() {
+func (x *X) getType(t string) *typeCache {
+	tc := x.typeCache[t]
+	tc.once.Do(func() {
+		idField, hasID := typeMap[t].t.FieldByName("ObjectID")
+		if hasID {
+			tc.byid = make(map[string]interface{})
+		}
 		f := x.xf.Open(typeMap[t].fn)
 		defer f.Close()
 		v := reflect.Indirect(reflect.New(reflect.SliceOf(typeMap[t].t)))
 		x.tparsev(f, v)
-		x.typeCache[t].v = v.Interface()
+		tc.v = v.Interface()
+		if hasID {
+			for i := 0; i < v.Len(); i++ {
+				elem := v.Index(i)
+				tc.byid[elem.FieldByIndex(idField.Index).String()] = elem.Addr().Interface()
+			}
+		}
 	})
-	return x.typeCache[t].v
+	return tc
 }
 
 func (x *X) GetSuns() []TSun {
-	return x.getType("Suns").([]TSun)
+	return x.getType("Suns").v.([]TSun)
 }
 
 // the only documentation of this I found was wrong.
@@ -77,7 +90,7 @@ type TSun struct {
 }
 
 func (x *X) GetShips() []Ship {
-	return x.getType("Ships").([]Ship)
+	return x.getType("Ships").v.([]Ship)
 }
 
 type Ship struct {
@@ -227,22 +240,7 @@ type Cockpit struct {
 }
 
 func (x *X) DockByID(id string) *TDock {
-	return x.GetDocks()[id]
-}
-
-func (x *X) GetDocks() map[string]*TDock {
-	x.docksOnce.Do(func() {
-		f := x.xf.Open("addon/types/TDocks.txt")
-		defer f.Close()
-		ds := []TDock{}
-		x.tparse(f, &ds)
-		x.docks = make(map[string]*TDock)
-		for i := range ds {
-			x.docks[ds[i].ObjectID] = &ds[i]
-		}
-	})
-
-	return x.docks
+	return x.getType("Docks").byid[id].(*TDock)
 }
 
 type TDock struct {
@@ -277,7 +275,7 @@ type TDock struct {
 }
 
 func (x *X) GetLasers() []TLaser {
-	return x.getType("Lasers").([]TLaser)
+	return x.getType("Lasers").v.([]TLaser)
 }
 
 type TLaser struct {
@@ -307,7 +305,7 @@ type TLaser struct {
 }
 
 func (x *X) GetShields() []TShield {
-	return x.getType("Shields").([]TShield)
+	return x.getType("Shields").v.([]TShield)
 }
 
 type TShield struct {
