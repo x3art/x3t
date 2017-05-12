@@ -26,8 +26,8 @@
     <tr>
      <td>{{.Description}}</td>
      <td>{{.RoF}}</td>
-     <td>{{calcf .Projectile.ShieldDamage 1000 "*" .RoF "/"}}</td>
-     <td>{{calcf .Projectile.HullDamage 1000 "*" .RoF "/"}}</td>
+     <td>{{printf "%.2f" (calcf .Projectile.ShieldDamage 1000 "*" .RoF "/")}}</td>
+     <td>{{printf "%.2f" (calcf .Projectile.HullDamage 1000 "*" .RoF "/")}}</td>
     </tr>
   {{- end}}
  {{- end}}
