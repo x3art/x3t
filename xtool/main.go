@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"x3t/xt"
+	"x3t/xt/bob"
 )
 
 func usage() {
@@ -45,6 +46,17 @@ func main() {
 			usage()
 		}
 		grep(x, args[2])
+	case "bob":
+		if flag.NArg() != 3 {
+			usage()
+		}
+		f := x.Open(args[2])
+		if f == nil {
+			fmt.Fprintf(os.Stderr, "No such file: %s\n", args[2])
+			os.Exit(1)
+		}
+		defer f.Close()
+		bob.Read(f)
 	default:
 		usage()
 	}
