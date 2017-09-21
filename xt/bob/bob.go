@@ -110,7 +110,7 @@ func sInfo(r *bufio.Reader) error {
 	return nil
 }
 
-func decodeStruct(r *bufio.Reader, data interface{}) error {
+func decodeVal(r *bufio.Reader, data interface{}) error {
 	return decode(r, reflect.Indirect(reflect.ValueOf(data)))
 }
 
@@ -118,35 +118,59 @@ func decode(r *bufio.Reader, v reflect.Value) error {
 	// Pretty simple, integer types are the right size and big
 	// endian, strings are nul-terminated. no alignment
 	// considerations.
-	if v.Kind() != reflect.Struct {
-		log.Fatal("decodeStruct: expected struct")
-	}
-	/*
-		if dec := v.MethodByName("Decode"); dec.IsValid() {
-			return dec.Call([]reflect.Value{reflect.ValueOf(r)})
-		}
-	*/
-	for i := 0; i < v.NumField(); i++ {
-		fv := v.Field(i)
-		switch fv.Kind() {
-		case reflect.Struct:
-			err := decode(r, fv)
-			if err != nil {
-				return err
-			}
-		case reflect.String:
-			s, err := r.ReadBytes(0)
-			if err != nil {
-				return err
-			}
-			fv.SetString(string(s))
-		case reflect.Slice:
 
-		default:
-			err := binary.Read(r, binary.BigEndian, fv.Addr().Interface())
+	if v.CanAddr() {
+		if dec := v.Addr().MethodByName("Decode"); dec.IsValid() {
+			ret := dec.Call([]reflect.Value{reflect.ValueOf(r)})
+			if len(ret) != 1 {
+				return fmt.Errorf("Decode bad ret: %v", ret)
+			}
+			r := ret[0].Interface()
+			if r != nil {
+				return r.(error)
+			}
+			return nil
+		}
+	}
+
+	switch v.Kind() {
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			err := decode(r, v.Field(i))
 			if err != nil {
 				return err
 			}
+		}
+	case reflect.String:
+		s, err := r.ReadBytes(0)
+		if err != nil {
+			return err
+		}
+		v.SetString(string(s))
+	case reflect.Slice:
+		var l int16
+		err := decodeVal(r, &l)
+		if err != nil {
+			return err
+		}
+		v.Set(reflect.MakeSlice(v.Type(), int(l), int(l)))
+		for i := 0; i < int(l); i++ {
+			err := decode(r, v.Index(i))
+			if err != nil {
+				return err
+			}
+		}
+	case reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			err := decode(r, v.Index(i))
+			if err != nil {
+				return err
+			}
+		}
+	default:
+		err := binary.Read(r, binary.BigEndian, v.Addr().Interface())
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -180,10 +204,33 @@ type mat6Value struct {
 		Name string
 		Type int16
 	}
+	b  int32
+	i  int32
+	f  float32
+	f4 [4]float32
+	s  string
 }
 
 func (m *mat6Value) Decode(r *bufio.Reader) error {
-	return nil
+	err := decodeVal(r, &m.Hdr)
+	if err != nil {
+		return err
+	}
+	var data interface{}
+	// XXX - make constants, not magic numbers here.
+	switch m.Hdr.Type {
+	case 0:
+		data = &m.i
+	case 1:
+		data = &m.b
+	case 2:
+		data = &m.f
+	case 5:
+		data = &m.f4
+	case 8:
+		data = &m.s
+	}
+	return decodeVal(r, data)
 }
 
 func sMat6(r *bufio.Reader) error {
@@ -192,7 +239,7 @@ func sMat6(r *bufio.Reader) error {
 		Index int16
 		Flags int32
 	}
-	err := decodeStruct(r, &matHdr)
+	err := decodeVal(r, &matHdr)
 	if err != nil {
 		return err
 	}
@@ -202,9 +249,9 @@ func sMat6(r *bufio.Reader) error {
 		var big struct {
 			Technique int16
 			Effect    string
-			value     []mat6Value
+			Value     []mat6Value
 		}
-		err := decodeStruct(r, &big)
+		err := decodeVal(r, &big)
 		if err != nil {
 			return err
 		}
