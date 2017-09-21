@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"reflect"
 )
 
 // Current understanding of the BOB format:
@@ -109,6 +110,48 @@ func sInfo(r *bufio.Reader) error {
 	return nil
 }
 
+func decodeStruct(r *bufio.Reader, data interface{}) error {
+	return decode(r, reflect.Indirect(reflect.ValueOf(data)))
+}
+
+func decode(r *bufio.Reader, v reflect.Value) error {
+	// Pretty simple, integer types are the right size and big
+	// endian, strings are nul-terminated. no alignment
+	// considerations.
+	if v.Kind() != reflect.Struct {
+		log.Fatal("decodeStruct: expected struct")
+	}
+	/*
+		if dec := v.MethodByName("Decode"); dec.IsValid() {
+			return dec.Call([]reflect.Value{reflect.ValueOf(r)})
+		}
+	*/
+	for i := 0; i < v.NumField(); i++ {
+		fv := v.Field(i)
+		switch fv.Kind() {
+		case reflect.Struct:
+			err := decode(r, fv)
+			if err != nil {
+				return err
+			}
+		case reflect.String:
+			s, err := r.ReadBytes(0)
+			if err != nil {
+				return err
+			}
+			fv.SetString(string(s))
+		case reflect.Slice:
+
+		default:
+			err := binary.Read(r, binary.BigEndian, fv.Addr().Interface())
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 const matFlagBig = 0x2000000
 
 func sMat6Pair(r *bufio.Reader, name string) {
@@ -132,28 +175,40 @@ type Mat1Pair struct {
 	Value, Strength int16
 }
 
+type mat6Value struct {
+	Hdr struct {
+		Name string
+		Type int16
+	}
+}
+
+func (m *mat6Value) Decode(r *bufio.Reader) error {
+	return nil
+}
+
 func sMat6(r *bufio.Reader) error {
 	var matHdr struct {
 		Count int32
 		Index int16
 		Flags int32
 	}
-	err := binary.Read(r, binary.BigEndian, &matHdr)
+	err := decodeStruct(r, &matHdr)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("MAT6: cnt: %v\n", matHdr)
+
+	fmt.Printf("MAT6: hdr: %v\n", matHdr)
 	if (matHdr.Flags & matFlagBig) != 0 {
-		var technique int16
-		err = binary.Read(r, binary.BigEndian, &technique)
+		var big struct {
+			Technique int16
+			Effect    string
+			value     []mat6Value
+		}
+		err := decodeStruct(r, &big)
 		if err != nil {
 			return err
 		}
-		effect, err := r.ReadBytes(0)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("big: %d %s\n", technique, effect)
+		fmt.Printf("big: %v\n", big)
 
 		return fmt.Errorf("big mat not implemented")
 	} else {
