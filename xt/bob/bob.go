@@ -78,7 +78,8 @@ func sAny(r *bufio.Reader) error {
 		return err
 	}
 	if string(s) != e {
-		return fmt.Errorf("expected %s, got %s", e, s)
+		xxx, _ := r.Peek(120)
+		return fmt.Errorf("expected %s, got %v (%v)", e, s, string(xxx))
 	}
 	return nil
 }
@@ -229,59 +230,65 @@ func (m *mat6Value) Decode(r *bufio.Reader) error {
 		data = &m.f4
 	case 8:
 		data = &m.s
+	default:
+		return fmt.Errorf("unknown mat6 type")
 	}
 	return decodeVal(r, data)
 }
 
 func sMat6(r *bufio.Reader) error {
-	var matHdr struct {
-		Count int32
-		Index int16
-		Flags int32
-	}
-	err := decodeVal(r, &matHdr)
+	var count int32
+	err := decodeVal(r, &count)
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("MAT6: hdr: %v\n", matHdr)
-	if (matHdr.Flags & matFlagBig) != 0 {
-		var big struct {
-			Technique int16
-			Effect    string
-			Value     []mat6Value
+	for i := 0; i < int(count); i++ {
+		var matHdr struct {
+			Index int16
+			Flags int32
 		}
-		err := decodeVal(r, &big)
+		err := decodeVal(r, &matHdr)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("big: %v\n", big)
 
-		return fmt.Errorf("big mat not implemented")
-	} else {
-		// XXX - untested, but implemented because of earlier misunderstanding.
-		textureFile, err := r.ReadBytes(0)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("textureFile: %s\n", textureFile)
-		p, _ := r.Peek(50)
-		fmt.Printf("peek: %s %v\n", p, p)
+		fmt.Printf("MAT6: hdr: %v %x\n", matHdr.Index, matHdr.Flags)
+		if matHdr.Flags == matFlagBig {
+			var big struct {
+				Technique int16
+				Effect    string
+				Value     []mat6Value
+			}
+			err := decodeVal(r, &big)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("big: %v\n", big)
+		} else {
+			// XXX - untested, but implemented because of earlier misunderstanding.
+			textureFile, err := r.ReadBytes(0)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("textureFile: %s\n", textureFile)
+			p, _ := r.Peek(50)
+			fmt.Printf("peek: %s %v\n", p, p)
 
-		var small struct {
-			Ambient, Diffuse, Specular Mat1RGB
-			Transparency               int32
-			SelfIllumination           int16
-			Shininess                  Mat1Pair
-			TextureValue               int16
+			var small struct {
+				Ambient, Diffuse, Specular Mat1RGB
+				Transparency               int32
+				SelfIllumination           int16
+				Shininess                  Mat1Pair
+				TextureValue               int16
+			}
+			err = binary.Read(r, binary.BigEndian, &small)
+			fmt.Printf("small: %v\n", small)
+			sMat6Pair(r, "enviromentMap")
+			sMat6Pair(r, "bumpMap")
+			sMat6Pair(r, "lightMap")
+			sMat6Pair(r, "map4")
+			sMat6Pair(r, "map5")
 		}
-		err = binary.Read(r, binary.BigEndian, &small)
-		fmt.Printf("small: %v\n", small)
-		sMat6Pair(r, "enviromentMap")
-		sMat6Pair(r, "bumpMap")
-		sMat6Pair(r, "lightMap")
-		sMat6Pair(r, "map4")
-		sMat6Pair(r, "map5")
 	}
-	return fmt.Errorf("not impl")
+	return nil
 }
