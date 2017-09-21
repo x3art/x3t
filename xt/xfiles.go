@@ -85,7 +85,8 @@ var pckMap = map[string]string{
 // Must be called with native paths, we'll convert back to slashes.
 func (xf *Xfiles) add(fn string, xd Xdata) {
 	d, f := filepath.Split(fn)
-	if filepath.Ext(f) == ".pck" {
+	switch filepath.Ext(f) {
+	case ".pck":
 		base := filepath.Base(d)
 		if pm := pckMap[base]; pm == "" {
 			log.Printf("Path '%s' (%s) has a .pck file without mapping", fn, base)
@@ -93,8 +94,10 @@ func (xf *Xfiles) add(fn string, xd Xdata) {
 			f = strings.TrimSuffix(f, "pck") + pm
 		}
 		xd = pck{xd}
-	} else if filepath.Ext(f) == ".pbd" {
+	case ".pbd":
 		xd = pck{xd}
+	case ".bob":
+		xd = bobOpener{xd}
 	}
 	d = strings.TrimSuffix(filepath.ToSlash(d), "/")
 	if xf.f[d] == nil {
@@ -242,6 +245,15 @@ func (p pck) Open() io.ReadCloser {
 		tmp := make([]byte, 1, 1)
 		_, _ = r.Read(tmp)
 		rs.cookie = cookie
+	} else if cookie := (hdr[0] ^ 31); hdr[1]^(cookie+1) == 138 && hdr[2]^(cookie+2) == 8 {
+		rs.cookie = cookie
+		rs.addOff = true
+	} else if cookie := (hdr[1] ^ 31); hdr[2]^(cookie+2) == 138 && hdr[3]^(cookie+3) == 8 {
+		tmp := make([]byte, 1, 1)
+		_, _ = r.Read(tmp)
+
+		rs.cookie = cookie
+		rs.addOff = true
 	} else {
 		log.Printf("unknown scrambling method. fingers crossed.")
 	}
@@ -260,4 +272,12 @@ func (pr *pckReader) Read(p []byte) (int, error) {
 func (pr *pckReader) Close() error {
 	pr.zr.Close()
 	return pr.r.Close()
+}
+
+type bobOpener struct {
+	xd Xdata
+}
+
+func (b bobOpener) Open() io.ReadCloser {
+	return &stupidDescrambler{r: b.xd.Open(), cookie: 51}
 }
