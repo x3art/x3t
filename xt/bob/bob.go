@@ -147,7 +147,7 @@ func decode(r *bufio.Reader, v reflect.Value) error {
 		if err != nil {
 			return err
 		}
-		v.SetString(string(s))
+		v.SetString(string(s[:len(s)-1]))
 	case reflect.Slice:
 		var l int16
 		err := decodeVal(r, &l)
