@@ -60,13 +60,16 @@ func sectLookup(s string) (func(*bufio.Reader) error, string) {
 	return nil, ""
 }
 
-func sect(r *bufio.Reader, s, e string, f func() error) error {
+func sect(r *bufio.Reader, s, e string, optional bool, f func() error) error {
 	hdr := make([]byte, 4, 4)
 	_, err := r.Read(hdr)
 	if err != nil {
 		return err
 	}
 	if string(hdr) != s {
+		if optional {
+			return nil
+		}
 		return fmt.Errorf("unexpected [%s], expected [%s]", hdr, s)
 	}
 	err = f()
@@ -89,23 +92,28 @@ func sAny(r *bufio.Reader) error {
 	if f == nil {
 		return fmt.Errorf("reader for %s not implemented", s)
 	}
-	return sect(r, string(s), e, func() error { return f(r) })
+	return sect(r, string(s), e, false, func() error { return f(r) })
+}
+
+type bob struct {
+	Info info
+	Mat6 mat6
 }
 
 func sBob(r *bufio.Reader) error {
-	for {
-		s, err := r.Peek(4)
-		if err != nil {
-			return err
-		}
-		if string(s) == "/BOB" {
-			return nil
-		}
-		err = sAny(r)
-		if err != nil {
-			return err
-		}
-	}
+	b := bob{}
+	err := decodeVal(r, &b)
+	fmt.Printf("%v\n", b)
+	return err
+}
+
+type info string
+
+func (i *info) Decode(r *bufio.Reader) error {
+	s := ""
+	err := sect(r, "INFO", "/INF", true, func() error { return decodeVal(r, &s) })
+	*i = info(s)
+	return err
 }
 
 func sInfo(r *bufio.Reader) error {
@@ -241,6 +249,12 @@ func (m *mat6Value) Decode(r *bufio.Reader) error {
 		return fmt.Errorf("unknown mat6 type")
 	}
 	return decodeVal(r, data)
+}
+
+type mat6 struct{}
+
+func (m *mat6) Decode(r *bufio.Reader) error {
+	return sect(r, "MAT6", "/MAT", false, func() error { return sMat6(r) })
 }
 
 func sMat6(r *bufio.Reader) error {
