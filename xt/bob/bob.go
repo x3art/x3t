@@ -42,7 +42,7 @@ func sect(r *bufio.Reader, s, e string, optional bool, f func() error) error {
 	}
 	_, err = r.Read(hdr)
 	if string(hdr) != e {
-		return fmt.Errorf("unexpected [%s], expected [%s]", hdr, s)
+		return fmt.Errorf("unexpected [%s], expected [%s]", hdr, e)
 	}
 	return nil
 }
@@ -50,27 +50,29 @@ func sect(r *bufio.Reader, s, e string, optional bool, f func() error) error {
 type bob struct {
 	Info info
 	Mat6 mat6
+	Body body
 }
 
 type info string
 
 func (i *info) Decode(r *bufio.Reader) error {
-	s := ""
-	err := sect(r, "INFO", "/INF", true, func() error { return decodeVal(r, &s) })
-	*i = info(s)
-	return err
+	return sect(r, "INFO", "/INF", true, func() error { return decodeValRaw(r, i) })
 }
 
 func decodeVal(r *bufio.Reader, data interface{}) error {
-	return decode(r, reflect.Indirect(reflect.ValueOf(data)))
+	return decode(r, false, reflect.Indirect(reflect.ValueOf(data)))
 }
 
-func decode(r *bufio.Reader, v reflect.Value) error {
+func decodeValRaw(r *bufio.Reader, data interface{}) error {
+	return decode(r, true, reflect.Indirect(reflect.ValueOf(data)))
+}
+
+func decode(r *bufio.Reader, skipMethod bool, v reflect.Value) error {
 	// Pretty simple, integer types are the right size and big
 	// endian, strings are nul-terminated. no alignment
 	// considerations.
 
-	if v.CanAddr() {
+	if !skipMethod && v.CanAddr() {
 		if dec := v.Addr().MethodByName("Decode"); dec.IsValid() {
 			ret := dec.Call([]reflect.Value{reflect.ValueOf(r)})
 			if len(ret) != 1 {
@@ -87,7 +89,7 @@ func decode(r *bufio.Reader, v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
-			err := decode(r, v.Field(i))
+			err := decode(r, false, v.Field(i))
 			if err != nil {
 				return err
 			}
@@ -106,14 +108,14 @@ func decode(r *bufio.Reader, v reflect.Value) error {
 		}
 		v.Set(reflect.MakeSlice(v.Type(), int(l), int(l)))
 		for i := 0; i < int(l); i++ {
-			err := decode(r, v.Index(i))
+			err := decode(r, false, v.Index(i))
 			if err != nil {
 				return err
 			}
 		}
 	case reflect.Array:
 		for i := 0; i < v.Len(); i++ {
-			err := decode(r, v.Index(i))
+			err := decode(r, false, v.Index(i))
 			if err != nil {
 				return err
 			}
@@ -235,15 +237,15 @@ func (m *mat6) Decode(r *bufio.Reader) error {
 	})
 }
 
-/*
 type body struct {
-	bones // bone
-	points // POINT section?
-	parts  // slice part
-	weights // slice WEIGHT sections?
+	/*
+		bones // bone
+		points // POINT section?
+		parts  // slice part
+		weights // slice WEIGHT sections?
+	*/
 }
 
-func sBody(r *bufio.Reader) error {
-	bodies := []body{}
+func (b *body) Decode(r *bufio.Reader) error {
+	return sect(r, "BODY", "/BOD", false, func() error { return decodeValRaw(r, b) })
 }
-*/
