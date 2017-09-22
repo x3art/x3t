@@ -16,7 +16,7 @@ import (
 func Read(r io.Reader) {
 	br := bufio.NewReader(r)
 	b := bob{}
-	err := sect(br, "BOB1", "/BOB", false, func() error { return decodeVal(br, &b) })
+	err := sect(br, "BOB1", "/BOB", false, func() error { return decodeVal(br, 0, &b) })
 	fmt.Printf("%v\n", b)
 	if err != nil {
 		log.Fatal(err)
@@ -56,23 +56,23 @@ type bob struct {
 type info string
 
 func (i *info) Decode(r *bufio.Reader) error {
-	return sect(r, "INFO", "/INF", true, func() error { return decodeValRaw(r, i) })
+	return sect(r, "INFO", "/INF", true, func() error { return decodeVal(r, skipMethod, i) })
 }
 
-func decodeVal(r *bufio.Reader, data interface{}) error {
-	return decode(r, false, reflect.Indirect(reflect.ValueOf(data)))
+func decodeVal(r *bufio.Reader, flags uint, data interface{}) error {
+	return decode(r, flags, reflect.Indirect(reflect.ValueOf(data)))
 }
 
-func decodeValRaw(r *bufio.Reader, data interface{}) error {
-	return decode(r, true, reflect.Indirect(reflect.ValueOf(data)))
-}
+const (
+	skipMethod = uint(1 << iota)
+)
 
-func decode(r *bufio.Reader, skipMethod bool, v reflect.Value) error {
+func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 	// Pretty simple, integer types are the right size and big
 	// endian, strings are nul-terminated. no alignment
 	// considerations.
 
-	if !skipMethod && v.CanAddr() {
+	if (flags&skipMethod) == 0 && v.CanAddr() {
 		if dec := v.Addr().MethodByName("Decode"); dec.IsValid() {
 			ret := dec.Call([]reflect.Value{reflect.ValueOf(r)})
 			if len(ret) != 1 {
@@ -89,7 +89,7 @@ func decode(r *bufio.Reader, skipMethod bool, v reflect.Value) error {
 	switch v.Kind() {
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
-			err := decode(r, false, v.Field(i))
+			err := decode(r, 0, v.Field(i))
 			if err != nil {
 				return err
 			}
@@ -102,20 +102,20 @@ func decode(r *bufio.Reader, skipMethod bool, v reflect.Value) error {
 		v.SetString(string(s[:len(s)-1]))
 	case reflect.Slice:
 		var l int16
-		err := decodeVal(r, &l)
+		err := decodeVal(r, 0, &l)
 		if err != nil {
 			return err
 		}
 		v.Set(reflect.MakeSlice(v.Type(), int(l), int(l)))
 		for i := 0; i < int(l); i++ {
-			err := decode(r, false, v.Index(i))
+			err := decode(r, 0, v.Index(i))
 			if err != nil {
 				return err
 			}
 		}
 	case reflect.Array:
 		for i := 0; i < v.Len(); i++ {
-			err := decode(r, false, v.Index(i))
+			err := decode(r, 0, v.Index(i))
 			if err != nil {
 				return err
 			}
@@ -144,7 +144,7 @@ type mat6Value struct {
 }
 
 func (m *mat6Value) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, &m.Hdr)
+	err := decodeVal(r, 0, &m.Hdr)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func (m *mat6Value) Decode(r *bufio.Reader) error {
 	default:
 		return fmt.Errorf("unknown mat6 type")
 	}
-	return decodeVal(r, data)
+	return decodeVal(r, 0, data)
 }
 
 type mat6 struct{}
@@ -211,7 +211,7 @@ type mat6small struct {
 }
 
 func (m *material6) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, &m.matHdr)
+	err := decodeVal(r, 0, &m.matHdr)
 	if err != nil {
 		return err
 	}
@@ -220,19 +220,19 @@ func (m *material6) Decode(r *bufio.Reader) error {
 	} else {
 		m.mat = &mat6small{}
 	}
-	return decodeVal(r, m.mat)
+	return decodeVal(r, 0, m.mat)
 }
 
 func (m *mat6) Decode(r *bufio.Reader) error {
 	return sect(r, "MAT6", "/MAT", false, func() error {
 		var count int32
-		err := decodeVal(r, &count)
+		err := decodeVal(r, 0, &count)
 		if err != nil {
 			return err
 		}
 		for i := 0; i < int(count); i++ {
 			m := material6{}
-			err := decodeVal(r, &m)
+			err := decodeVal(r, 0, &m)
 			if err != nil {
 				return err
 			}
@@ -252,5 +252,5 @@ type body struct {
 }
 
 func (b *body) Decode(r *bufio.Reader) error {
-	return sect(r, "BODY", "/BOD", false, func() error { return decodeValRaw(r, b) })
+	return sect(r, "BODY", "/BOD", false, func() error { return decodeVal(r, skipMethod, b) })
 }
