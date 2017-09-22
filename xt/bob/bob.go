@@ -60,9 +60,28 @@ func sectLookup(s string) (func(*bufio.Reader) error, string) {
 	return nil, ""
 }
 
+func sect(r *bufio.Reader, s, e string, f func() error) error {
+	hdr := make([]byte, 4, 4)
+	_, err := r.Read(hdr)
+	if err != nil {
+		return err
+	}
+	if string(hdr) != s {
+		return fmt.Errorf("unexpected [%s], expected [%s]", hdr, s)
+	}
+	err = f()
+	if err != nil {
+		return err
+	}
+	_, err = r.Read(hdr)
+	if string(hdr) != e {
+		return fmt.Errorf("unexpected [%s], expected [%s]", hdr, s)
+	}
+	return nil
+}
+
 func sAny(r *bufio.Reader) error {
-	s := make([]byte, 4)
-	_, err := r.Read(s)
+	s, err := r.Peek(4)
 	if err != nil {
 		return err
 	}
@@ -70,18 +89,7 @@ func sAny(r *bufio.Reader) error {
 	if f == nil {
 		return fmt.Errorf("reader for %s not implemented", s)
 	}
-	err = f(r)
-	if err != nil {
-		return err
-	}
-	if _, err := r.Read(s); err != nil {
-		return err
-	}
-	if string(s) != e {
-		xxx, _ := r.Peek(120)
-		return fmt.Errorf("expected %s, got %v (%v)", e, s, string(xxx))
-	}
-	return nil
+	return sect(r, string(s), e, func() error { return f(r) })
 }
 
 func sBob(r *bufio.Reader) error {
@@ -101,13 +109,12 @@ func sBob(r *bufio.Reader) error {
 }
 
 func sInfo(r *bufio.Reader) error {
-	inf, err := r.ReadBytes(0)
+	s := ""
+	err := decodeVal(r, &s)
 	if err != nil {
 		return err
 	}
-	// strip the trailing \0
-	inf = inf[:len(inf)-1]
-	fmt.Printf("Info: %s\n", inf)
+	fmt.Printf("Info: %s\n", s)
 	return nil
 }
 
@@ -292,3 +299,16 @@ func sMat6(r *bufio.Reader) error {
 	}
 	return nil
 }
+
+/*
+type body struct {
+	bones // bone
+	points // POINT section?
+	parts  // slice part
+	weights // slice WEIGHT sections?
+}
+
+func sBody(r *bufio.Reader) error {
+	bodies := []body{}
+}
+*/
