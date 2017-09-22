@@ -182,6 +182,47 @@ type Mat6Pair struct {
 	Value int16
 }
 
+type material6 struct {
+	matHdr struct {
+		Index int16
+		Flags int32
+	}
+	mat interface{}
+}
+
+type mat6big struct {
+	Technique int16
+	Effect    string
+	Value     []mat6Value
+}
+
+type mat6small struct {
+	TextureFile                string
+	Ambient, Diffuse, Specular Mat1RGB
+	Transparency               int32
+	SelfIllumination           int16
+	Shininess                  Mat1Pair
+	TextureValue               int16
+	EnvironmentMap             Mat6Pair
+	BumpMap                    Mat6Pair
+	LightMap                   Mat6Pair
+	Map4                       Mat6Pair
+	Map5                       Mat6Pair
+}
+
+func (m *material6) Decode(r *bufio.Reader) error {
+	err := decodeVal(r, &m.matHdr)
+	if err != nil {
+		return err
+	}
+	if m.matHdr.Flags == matFlagBig {
+		m.mat = &mat6big{}
+	} else {
+		m.mat = &mat6small{}
+	}
+	return decodeVal(r, m.mat)
+}
+
 func (m *mat6) Decode(r *bufio.Reader) error {
 	return sect(r, "MAT6", "/MAT", false, func() error {
 		var count int32
@@ -190,48 +231,12 @@ func (m *mat6) Decode(r *bufio.Reader) error {
 			return err
 		}
 		for i := 0; i < int(count); i++ {
-			var matHdr struct {
-				Index int16
-				Flags int32
-			}
-			err := decodeVal(r, &matHdr)
+			m := material6{}
+			err := decodeVal(r, &m)
 			if err != nil {
 				return err
 			}
-
-			fmt.Printf("MAT6: hdr: %v %x\n", matHdr.Index, matHdr.Flags)
-			if matHdr.Flags == matFlagBig {
-				var big struct {
-					Technique int16
-					Effect    string
-					Value     []mat6Value
-				}
-				err := decodeVal(r, &big)
-				if err != nil {
-					return err
-				}
-				fmt.Printf("big: %v\n", big)
-			} else {
-				// XXX - untested, but implemented because of earlier misunderstanding.
-				var small struct {
-					TextureFile                string
-					Ambient, Diffuse, Specular Mat1RGB
-					Transparency               int32
-					SelfIllumination           int16
-					Shininess                  Mat1Pair
-					TextureValue               int16
-					EnvironmentMap             Mat6Pair
-					BumpMap                    Mat6Pair
-					LightMap                   Mat6Pair
-					Map4                       Mat6Pair
-					Map5                       Mat6Pair
-				}
-				err = decodeVal(r, &small)
-				if err != nil {
-					return err
-				}
-				fmt.Printf("small: %v\n", small)
-			}
+			fmt.Printf("mat6: %v %v\n", m.matHdr, m.mat)
 		}
 		return nil
 	})
