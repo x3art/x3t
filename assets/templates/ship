@@ -7,10 +7,15 @@
   Speed: {{calc .Speed 500 "/"}} - {{ShipSpeedMax .}}<br />
   Hull strength: {{.HullStrength}}<br />
   Weapon energy: {{.WeaponsEnergy}} MJ (+{{calcf .WeaponsEnergy .WeaponsRechargeRate "*"}}MW)
+  <br />
+  Scene: {{.ShipScene}}
+  <br />
   Lasers:<br />
+<form>
   <table>
    <thead>
     <tr>
+     <th></th>
      <th>Name</th>
      <th>RoF</th>
      <th>Shield dps</th>
@@ -20,25 +25,33 @@
    <tbody>
 {{- $ship := .}}
 {{- with maskToLasers .PossibleLasers $ship.CargoType}}
-    <tr><td colspan="2">Main x{{ (index $ship.GunGroup 0).NumGuns }}</td></tr>
+    <tr><td>{{ (index $ship.GunGroup 0).NumGuns }}</td><td colspan="4">Main</td></tr>
  {{- range .}}
-  {{- block "laser" .}}
-    <tr>
-     <td>{{.Description}}</td>
-     <td>{{.RoF}}</td>
-     <td>{{printf "%.2f" (calcf .Projectile.ShieldDamage 1000 "*" .RoF "/")}}</td>
-     <td>{{printf "%.2f" (calcf .Projectile.HullDamage 1000 "*" .RoF "/")}}</td>
-    </tr>
-  {{- end}}
+   <tr>
+    <td><input type="radio" name="turret0"></td>
+    <td>{{.Description}}</td>
+    <td>{{.RoF}}</td>
+    <td>{{printf "%.2f" (calcf .Projectile.ShieldDamage 1000 "*" .RoF "/")}}</td>
+    <td>{{printf "%.2f" (calcf .Projectile.HullDamage 1000 "*" .RoF "/")}}</td>
+   </tr>
  {{- end}}
 {{- end}}
 {{- range $index, $td := .TurretDescriptor}}
  {{- $pos := .CPos}}
  {{- with maskToLasers .Cockpit.LaserMask $ship.CargoType}}
-   <tr><td colspan="2">{{ cockpitPos $pos }} x{{ (index $ship.GunGroup (calc $index 1 "+")).NumGuns }}</td></tr>
-  {{- range . }}{{template "laser" .}}{{end}}
+   <tr><td>{{ (index $ship.GunGroup (calc $index 1 "+")).NumGuns }}</td><td colspan="4">{{ cockpitPos $pos }}</td></tr>
+  {{- range . }}
+   <tr>
+    <td><input type="radio" name="turret{{calc $index 1 "+"}}"></td>
+    <td>{{.Description}}</td>
+    <td>{{.RoF}}</td>
+    <td>{{printf "%.2f" (calcf .Projectile.ShieldDamage 1000 "*" .RoF "/")}}</td>
+    <td>{{printf "%.2f" (calcf .Projectile.HullDamage 1000 "*" .RoF "/")}}</td>
+   </tr>
+  {{end}}
  {{- end}}
 {{- end}}
    </tbody>
   </table>
+</form>
 {{template "footer"}}

@@ -27,6 +27,8 @@ Minimum shields: <input type="number" name="minShields" min="0" max="500000" val
    <th>Shield (MJ)</th>
    <th>Max Cargo</th>
    <th>Laser count</th>
+   <th>Docking slots</th>
+   <th>Body</th>
   </tr>
  </thead>
  <tbody>
@@ -39,6 +41,8 @@ Minimum shields: <input type="number" name="minShields" min="0" max="500000" val
     <td>{{shieldStr .}}</td>
     <td>{{.CargoMax}}</td>
     <td>{{countGuns .}}</td>
+    <td>{{.DockingSlots}}</td>
+    <td>{{.PictureID}} // {{.ShipScene}}</td>
    </tr>
 {{- end}}
  </tbody>
