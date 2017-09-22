@@ -65,6 +65,7 @@ func decodeVal(r *bufio.Reader, flags uint, data interface{}) error {
 
 const (
 	skipMethod = uint(1 << iota)
+	len32
 )
 
 func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
@@ -101,13 +102,24 @@ func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 		}
 		v.SetString(string(s[:len(s)-1]))
 	case reflect.Slice:
-		var l int16
-		err := decodeVal(r, 0, &l)
-		if err != nil {
-			return err
+		l := 0
+		if (flags & len32) != 0 {
+			var x int32
+			err := decodeVal(r, 0, &x)
+			if err != nil {
+				return err
+			}
+			l = int(x)
+		} else {
+			var x int16
+			err := decodeVal(r, 0, &x)
+			if err != nil {
+				return err
+			}
+			l = int(x)
 		}
-		v.Set(reflect.MakeSlice(v.Type(), int(l), int(l)))
-		for i := 0; i < int(l); i++ {
+		v.Set(reflect.MakeSlice(v.Type(), l, l))
+		for i := 0; i < l; i++ {
 			err := decode(r, 0, v.Index(i))
 			if err != nil {
 				return err
@@ -167,8 +179,6 @@ func (m *mat6Value) Decode(r *bufio.Reader) error {
 	return decodeVal(r, 0, data)
 }
 
-type mat6 struct{}
-
 type Mat1RGB struct {
 	R, G, B int16
 }
@@ -223,23 +233,10 @@ func (m *material6) Decode(r *bufio.Reader) error {
 	return decodeVal(r, 0, m.mat)
 }
 
+type mat6 []material6
+
 func (m *mat6) Decode(r *bufio.Reader) error {
-	return sect(r, "MAT6", "/MAT", false, func() error {
-		var count int32
-		err := decodeVal(r, 0, &count)
-		if err != nil {
-			return err
-		}
-		for i := 0; i < int(count); i++ {
-			m := material6{}
-			err := decodeVal(r, 0, &m)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("mat6: %v %v\n", m.matHdr, m.mat)
-		}
-		return nil
-	})
+	return sect(r, "MAT6", "/MAT", false, func() error { return decodeVal(r, skipMethod|len32, m) })
 }
 
 type body struct {
