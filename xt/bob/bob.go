@@ -66,6 +66,10 @@ const (
 	len32
 )
 
+type decoder interface {
+	Decode(*bufio.Reader) error
+}
+
 type fieldSpecial struct {
 	flags        uint
 	sectStart    string
@@ -107,16 +111,8 @@ func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 	// considerations.
 
 	if (flags&skipMethod) == 0 && v.CanAddr() {
-		if dec := v.Addr().MethodByName("Decode"); dec.IsValid() {
-			ret := dec.Call([]reflect.Value{reflect.ValueOf(r)})
-			if len(ret) != 1 {
-				return fmt.Errorf("Decode bad ret: %v", ret)
-			}
-			r := ret[0].Interface()
-			if r != nil {
-				return r.(error)
-			}
-			return nil
+		if dc, ok := v.Addr().Interface().(decoder); ok {
+			return dc.Decode(r)
 		}
 	}
 
@@ -187,7 +183,7 @@ func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 
 type Bob struct {
 	Info   string      `x3t:"sect:INFO:/INF,optional"`
-	Mat6   []material6 `x3t:"len32,sect:MAT6:/MAT"`
+	Mat6   []material6 `x3t:"sect:MAT6:/MAT,len32"`
 	Bodies []body      `x3t:"sect:BODY:/BOD"`
 }
 
