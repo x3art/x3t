@@ -8,6 +8,7 @@ import (
 	"log"
 	"reflect"
 	"strings"
+	"time"
 )
 
 /*
@@ -19,7 +20,9 @@ import (
 func Read(r io.Reader) {
 	br := bufio.NewReader(r)
 	b := Bob{}
+	t := time.Now()
 	err := sect(br, "BOB1", "/BOB", false, func() error { return decodeVal(br, 0, &b) })
+	fmt.Printf("T: %v\n", time.Since(t))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,6 +66,41 @@ const (
 	len32
 )
 
+type fieldSpecial struct {
+	flags        uint
+	sectStart    string
+	sectEnd      string
+	sectOptional bool
+}
+
+var fsCache = map[reflect.Type][]fieldSpecial{}
+
+func structFields(t reflect.Type) []fieldSpecial {
+	if c, ok := fsCache[t]; ok {
+		return c
+	}
+	n := t.NumField()
+	ret := make([]fieldSpecial, n)
+	for i := 0; i < n; i++ {
+		for _, t := range strings.Split(t.Field(i).Tag.Get("x3t"), ",") {
+			if t == "len32" {
+				ret[i].flags |= len32
+			} else if strings.HasPrefix(t, "sect") {
+				x := strings.Split(t, ":")
+				if len(x) != 3 {
+					panic(fmt.Errorf("sect tag bad: [%s]", t))
+				}
+				ret[i].sectStart = x[1]
+				ret[i].sectEnd = x[2]
+			} else if t == "optional" {
+				ret[i].sectOptional = true
+			}
+		}
+	}
+	fsCache[t] = ret
+	return ret
+}
+
 func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 	// Pretty simple, integer types are the right size and big
 	// endian, strings are nul-terminated. no alignment
@@ -84,34 +122,18 @@ func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 
 	switch v.Kind() {
 	case reflect.Struct:
-		vt := v.Type()
+		fs := structFields(v.Type())
 		for i := 0; i < v.NumField(); i++ {
-			flags := uint(0)
-			sectStart, sectEnd := "", ""
-			sectOptional := false
-			for _, t := range strings.Split(vt.Field(i).Tag.Get("x3t"), ",") {
-				if t == "len32" {
-					flags |= len32
-				} else if strings.HasPrefix(t, "sect") {
-					x := strings.Split(t, ":")
-					if len(x) != 3 {
-						panic(fmt.Errorf("sect tag bad: [%s]", t))
-					}
-					sectStart = x[1]
-					sectEnd = x[2]
-				} else if t == "optional" {
-					sectOptional = true
-				}
-			}
-			if sectStart != "" {
-				err := sect(r, sectStart, sectEnd, sectOptional, func() error {
-					return decode(r, flags, v.Field(i))
+			f := &fs[i]
+			if f.sectStart != "" {
+				err := sect(r, f.sectStart, f.sectEnd, f.sectOptional, func() error {
+					return decode(r, f.flags, v.Field(i))
 				})
 				if err != nil {
 					return err
 				}
 			} else {
-				err := decode(r, flags, v.Field(i))
+				err := decode(r, f.flags, v.Field(i))
 				if err != nil {
 					return err
 				}
