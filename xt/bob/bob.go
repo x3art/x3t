@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"reflect"
+	"strings"
 )
 
 /*
@@ -17,11 +18,12 @@ import (
 
 func Read(r io.Reader) {
 	br := bufio.NewReader(r)
-	b := bob{}
+	b := Bob{}
 	err := sect(br, "BOB1", "/BOB", false, func() error { return decodeVal(br, 0, &b) })
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Printf("%v\n", b.Info)
 	return
 }
 
@@ -50,18 +52,6 @@ func sect(r *bufio.Reader, s, e string, optional bool, f func() error) error {
 		return fmt.Errorf("unexpected [%s]%v, expected [%s]", hdr, hdr, e)
 	}
 	return nil
-}
-
-type bob struct {
-	Info   info
-	Mat6   mat6
-	Bodies bodies
-}
-
-type info string
-
-func (i *info) Decode(r *bufio.Reader) error {
-	return sect(r, "INFO", "/INF", true, func() error { return decodeVal(r, skipMethod, i) })
 }
 
 func decodeVal(r *bufio.Reader, flags uint, data interface{}) error {
@@ -94,10 +84,37 @@ func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 
 	switch v.Kind() {
 	case reflect.Struct:
+		vt := v.Type()
 		for i := 0; i < v.NumField(); i++ {
-			err := decode(r, 0, v.Field(i))
-			if err != nil {
-				return err
+			flags := uint(0)
+			sectStart, sectEnd := "", ""
+			sectOptional := false
+			for _, t := range strings.Split(vt.Field(i).Tag.Get("x3t"), ",") {
+				if t == "len32" {
+					flags |= len32
+				} else if strings.HasPrefix(t, "sect") {
+					x := strings.Split(t, ":")
+					if len(x) != 3 {
+						panic(fmt.Errorf("sect tag bad: [%s]", t))
+					}
+					sectStart = x[1]
+					sectEnd = x[2]
+				} else if t == "optional" {
+					sectOptional = true
+				}
+			}
+			if sectStart != "" {
+				err := sect(r, sectStart, sectEnd, sectOptional, func() error {
+					return decode(r, flags, v.Field(i))
+				})
+				if err != nil {
+					return err
+				}
+			} else {
+				err := decode(r, flags, v.Field(i))
+				if err != nil {
+					return err
+				}
 			}
 		}
 	case reflect.String:
@@ -146,7 +163,11 @@ func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 	return nil
 }
 
-const matFlagBig = 0x2000000
+type Bob struct {
+	Info   string      `x3t:"sect:INFO:/INF,optional"`
+	Mat6   []material6 `x3t:"len32,sect:MAT6:/MAT"`
+	Bodies []body      `x3t:"sect:BODY:/BOD"`
+}
 
 type mat6Value struct {
 	Hdr struct {
@@ -184,25 +205,9 @@ func (m *mat6Value) Decode(r *bufio.Reader) error {
 	return decodeVal(r, 0, data)
 }
 
-type Mat1RGB struct {
-	R, G, B int16
-}
-
-type Mat1Pair struct {
-	Value, Strength int16
-}
-
 type Mat6Pair struct {
 	Name  string
 	Value int16
-}
-
-type material6 struct {
-	matHdr struct {
-		Index int16
-		Flags int32
-	}
-	mat interface{}
 }
 
 type mat6big struct {
@@ -213,16 +218,26 @@ type mat6big struct {
 
 type mat6small struct {
 	TextureFile                string
-	Ambient, Diffuse, Specular Mat1RGB
+	Ambient, Diffuse, Specular [3]int16
 	Transparency               int32
 	SelfIllumination           int16
-	Shininess                  Mat1Pair
+	Shininess                  [2]int16
 	TextureValue               int16
 	EnvironmentMap             Mat6Pair
 	BumpMap                    Mat6Pair
 	LightMap                   Mat6Pair
 	Map4                       Mat6Pair
 	Map5                       Mat6Pair
+}
+
+const matFlagBig = 0x2000000
+
+type material6 struct {
+	matHdr struct {
+		Index int16
+		Flags int32
+	}
+	mat interface{}
 }
 
 func (m *material6) Decode(r *bufio.Reader) error {
@@ -236,18 +251,6 @@ func (m *material6) Decode(r *bufio.Reader) error {
 		m.mat = &mat6small{}
 	}
 	return decodeVal(r, 0, m.mat)
-}
-
-type mat6 []material6
-
-func (m *mat6) Decode(r *bufio.Reader) error {
-	return sect(r, "MAT6", "/MAT", false, func() error { return decodeVal(r, skipMethod|len32, m) })
-}
-
-type bones []string
-
-func (b *bones) Decode(r *bufio.Reader) error {
-	return sect(r, "BONE", "/BON", true, func() error { return decodeVal(r, skipMethod|len32, b) })
 }
 
 type point struct {
@@ -283,12 +286,6 @@ func (p *point) Decode(r *bufio.Reader) error {
 	return nil
 }
 
-type points []point
-
-func (p *points) Decode(r *bufio.Reader) error {
-	return sect(r, "POIN", "/POI", true, func() error { return decodeVal(r, skipMethod|len32, p) })
-}
-
 type weight struct {
 	Weights []struct {
 		Idx   int16
@@ -296,38 +293,20 @@ type weight struct {
 	}
 }
 
-type weights []weight
-
-func (w *weights) Decode(r *bufio.Reader) error {
-	return sect(r, "WEIG", "/WEI", true, func() error { return decodeVal(r, skipMethod|len32, w) })
-}
-
 type uv struct {
 	Idx    int32
 	Values [6]float32
 }
 
-type uvlist []uv
-
-func (u *uvlist) Decode(r *bufio.Reader) error {
-	return decodeVal(r, skipMethod|len32, u)
-}
-
-type faces [][4]int32
-
-func (f *faces) Decode(r *bufio.Reader) error {
-	return decodeVal(r, skipMethod|len32, f)
-}
-
 type faceList struct {
 	MaterialIndex int32
-	Faces         faces
+	Faces         [][4]int32 `x3t:"len32"`
 }
 
 type faceListX3 struct {
 	MaterialIndex int32
-	Faces         faces
-	UVList        uvlist
+	Faces         [][4]int32 `x3t:"len32"`
+	UVList        []uv       `x3t:"len32"`
 }
 
 type part struct {
@@ -356,27 +335,11 @@ func (p *part) Decode(r *bufio.Reader) error {
 	return err
 }
 
-type parts []part
-
-func (p *parts) Decode(r *bufio.Reader) error {
-	return sect(r, "PART", "/PAR", true, func() error { return decodeVal(r, skipMethod|len32, p) })
-}
-
 type body struct {
 	Size    int32
 	Flags   int32
-	Bones   bones
-	Points  points
-	Weights weights
-	Parts   parts
-}
-
-func (b *body) Decode(r *bufio.Reader) error {
-	return decodeVal(r, skipMethod, b)
-}
-
-type bodies []body
-
-func (b *bodies) Decode(r *bufio.Reader) error {
-	return sect(r, "BODY", "/BOD", false, func() error { return decodeVal(r, skipMethod, b) })
+	Bones   []string `x3t:"sect:BONE:/BON,len32,optional"`
+	Points  []point  `x3t:"sect:POIN:/POI,len32,optional"`
+	Weights []weight `x3t:"sect:WEIG:/WEI,len32,optional"`
+	Parts   []part   `x3t:"sect:PART:/PAR,len32,optional"`
 }
