@@ -19,7 +19,6 @@ func Read(r io.Reader) {
 	br := bufio.NewReader(r)
 	b := bob{}
 	err := sect(br, "BOB1", "/BOB", false, func() error { return decodeVal(br, 0, &b) })
-	//	fmt.Printf("%v\n", b)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,7 +32,6 @@ func sect(r *bufio.Reader, s, e string, optional bool, f func() error) error {
 	}
 	if string(hdr) != s {
 		if optional {
-			log.Printf("unoptional(%s) %v/%s", s, hdr, hdr)
 			return nil
 		}
 		return fmt.Errorf("unexpected [%s], expected [%s]", hdr, s)
@@ -43,17 +41,14 @@ func sect(r *bufio.Reader, s, e string, optional bool, f func() error) error {
 			return err
 		}
 	}
-	log.Printf("start %s", s)
 	err = f()
 	if err != nil {
 		return err
 	}
 	_, err = r.Read(hdr)
 	if string(hdr) != e {
-		log.Print(r.Peek(100))
 		return fmt.Errorf("unexpected [%s]%v, expected [%s]", hdr, hdr, e)
 	}
-	log.Printf("end %s", s)
 	return nil
 }
 
@@ -374,18 +369,10 @@ type body struct {
 	Points  points
 	Weights weights
 	Parts   parts
-	/*
-		bones // bone
-		points // POINT section?
-		parts  // slice part
-		weights // slice WEIGHT sections?
-	*/
 }
 
 func (b *body) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, skipMethod, b)
-	fmt.Printf("body %x\n", b.Size)
-	return err
+	return decodeVal(r, skipMethod, b)
 }
 
 type bodies []body
