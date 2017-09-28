@@ -138,6 +138,29 @@ func decode32(r *bufio.Reader) (int32, error) {
 	return int32(uint32(d[3]) | uint32(d[2])<<8 | uint32(d[1])<<16 | uint32(d[0])<<24), nil
 }
 
+func arrsl(r *bufio.Reader, v interface{}) error {
+	var err error
+	switch v := v.(type) {
+	case []int16:
+		for i := range v {
+			v[i], err = decode16(r)
+		}
+	case []int32:
+		for i := range v {
+			v[i], err = decode32(r)
+		}
+	case []float32:
+		for i := range v {
+			var x int32
+			x, err = decode32(r)
+			v[i] = math.Float32frombits(uint32(x))
+		}
+	default:
+		log.Fatalf("unknown array slice %T", v)
+	}
+	return err
+}
+
 func (ti *typeInfo) decodev(r *bufio.Reader, v interface{}) error {
 	// Pretty simple, integer types are the right size and big
 	// endian, strings are nul-terminated. no alignment
@@ -168,14 +191,13 @@ func (ti *typeInfo) decodev(r *bufio.Reader, v interface{}) error {
 		switch v := v.(type) {
 		case *[]int16:
 			*v = make([]int16, sliceLen, sliceLen)
-			for i := range *v {
-				(*v)[i], err = decode16(r)
-			}
+			return arrsl(r, *v)
 		case *[]int32:
 			*v = make([]int32, sliceLen, sliceLen)
-			for i := range *v {
-				(*v)[i], err = decode32(r)
-			}
+			return arrsl(r, *v)
+		case *[]float32:
+			*v = make([]float32, sliceLen, sliceLen)
+			return arrsl(r, *v)
 		default:
 			val := reflect.Indirect(reflect.ValueOf(v))
 			val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
@@ -205,11 +227,7 @@ func (ti *typeInfo) decodev(r *bufio.Reader, v interface{}) error {
 		return nil
 	case reflect.Array:
 		val := reflect.Indirect(reflect.ValueOf(v))
-		// XXX - should we just slice it and let this function deal with it?
-		for i := 0; i < val.Len(); i++ {
-			err = ti.slTi.decodev(r, val.Index(i).Addr().Interface())
-		}
-		return err
+		return arrsl(r, val.Slice(0, val.Len()).Interface())
 	}
 
 	switch v := v.(type) {
