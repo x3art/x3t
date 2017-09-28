@@ -62,12 +62,17 @@ func decodeVal(r *bufio.Reader, flags uint, data interface{}) error {
 }
 
 const (
-	skipMethod = uint(1 << iota)
-	len32
+	len32 = uint(1 << iota)
 )
 
 type decoder interface {
 	Decode(*bufio.Reader) error
+}
+
+type typeInfo struct {
+	kind   reflect.Kind
+	slTi   *typeInfo
+	fields []fieldSpecial
 }
 
 type fieldSpecial struct {
@@ -75,61 +80,74 @@ type fieldSpecial struct {
 	sectStart    string
 	sectEnd      string
 	sectOptional bool
+	ti           *typeInfo
 }
 
-var fsCache = map[reflect.Type][]fieldSpecial{}
+var fsCache = map[reflect.Type]*typeInfo{}
 
-func structFields(t reflect.Type) []fieldSpecial {
+func tinfo(t reflect.Type) *typeInfo {
 	if c, ok := fsCache[t]; ok {
 		return c
 	}
-	n := t.NumField()
-	ret := make([]fieldSpecial, n)
-	for i := 0; i < n; i++ {
-		for _, t := range strings.Split(t.Field(i).Tag.Get("x3t"), ",") {
-			if t == "len32" {
-				ret[i].flags |= len32
-			} else if strings.HasPrefix(t, "sect") {
-				x := strings.Split(t, ":")
-				if len(x) != 3 {
-					panic(fmt.Errorf("sect tag bad: [%s]", t))
+	ret := &typeInfo{}
+	ret.kind = t.Kind()
+	switch ret.kind {
+	case reflect.Struct:
+		n := t.NumField()
+		ret.fields = make([]fieldSpecial, n)
+		for i := 0; i < n; i++ {
+			for _, t := range strings.Split(t.Field(i).Tag.Get("x3t"), ",") {
+				if t == "len32" {
+					ret.fields[i].flags |= len32
+				} else if strings.HasPrefix(t, "sect") {
+					x := strings.Split(t, ":")
+					if len(x) != 3 {
+						panic(fmt.Errorf("sect tag bad: [%s]", t))
+					}
+					ret.fields[i].sectStart = x[1]
+					ret.fields[i].sectEnd = x[2]
+				} else if t == "optional" {
+					ret.fields[i].sectOptional = true
 				}
-				ret[i].sectStart = x[1]
-				ret[i].sectEnd = x[2]
-			} else if t == "optional" {
-				ret[i].sectOptional = true
 			}
+			ret.fields[i].ti = tinfo(t.Field(i).Type)
 		}
+	case reflect.Slice, reflect.Array:
+		ret.slTi = tinfo(t.Elem())
 	}
 	fsCache[t] = ret
 	return ret
 }
 
 func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
+	ti := tinfo(v.Type())
+	return ti.decode(r, flags, v)
+}
+
+func (ti *typeInfo) decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 	// Pretty simple, integer types are the right size and big
 	// endian, strings are nul-terminated. no alignment
 	// considerations.
 
-	if (flags&skipMethod) == 0 && v.CanAddr() {
+	if v.CanAddr() {
 		if dc, ok := v.Addr().Interface().(decoder); ok {
 			return dc.Decode(r)
 		}
 	}
 
-	switch v.Kind() {
+	switch ti.kind {
 	case reflect.Struct:
-		fs := structFields(v.Type())
 		for i := 0; i < v.NumField(); i++ {
-			f := &fs[i]
+			f := &ti.fields[i]
 			if f.sectStart != "" {
 				err := sect(r, f.sectStart, f.sectEnd, f.sectOptional, func() error {
-					return decode(r, f.flags, v.Field(i))
+					return f.ti.decode(r, f.flags, v.Field(i))
 				})
 				if err != nil {
 					return err
 				}
 			} else {
-				err := decode(r, f.flags, v.Field(i))
+				err := f.ti.decode(r, f.flags, v.Field(i))
 				if err != nil {
 					return err
 				}
@@ -160,14 +178,14 @@ func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
 		}
 		v.Set(reflect.MakeSlice(v.Type(), l, l))
 		for i := 0; i < l; i++ {
-			err := decode(r, 0, v.Index(i))
+			err := ti.slTi.decode(r, 0, v.Index(i))
 			if err != nil {
 				return err
 			}
 		}
 	case reflect.Array:
 		for i := 0; i < v.Len(); i++ {
-			err := decode(r, 0, v.Index(i))
+			err := ti.slTi.decode(r, 0, v.Index(i))
 			if err != nil {
 				return err
 			}
