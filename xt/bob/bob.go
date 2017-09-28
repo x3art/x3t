@@ -2,10 +2,10 @@ package bob
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"reflect"
 	"strings"
 	"time"
@@ -21,7 +21,7 @@ func Read(r io.Reader) {
 	br := bufio.NewReader(r)
 	b := Bob{}
 	t := time.Now()
-	err := sect(br, "BOB1", "/BOB", false, func() error { return decodeVal(br, 0, &b) })
+	err := sect(br, "BOB1", "/BOB", false, func() error { return decodeVal(br, &b) })
 	fmt.Printf("T: %v\n", time.Since(t))
 	if err != nil {
 		log.Fatal(err)
@@ -57,8 +57,8 @@ func sect(r *bufio.Reader, s, e string, optional bool, f func() error) error {
 	return nil
 }
 
-func decodeVal(r *bufio.Reader, flags uint, data interface{}) error {
-	return decode(r, flags, reflect.Indirect(reflect.ValueOf(data)))
+func decodeVal(r *bufio.Reader, data interface{}) error {
+	return tinfo(reflect.TypeOf(data).Elem(), 0).decodev(r, data)
 }
 
 const (
@@ -70,13 +70,13 @@ type decoder interface {
 }
 
 type typeInfo struct {
+	flags  uint
 	kind   reflect.Kind
 	slTi   *typeInfo
 	fields []fieldSpecial
 }
 
 type fieldSpecial struct {
-	flags        uint
 	sectStart    string
 	sectEnd      string
 	sectOptional bool
@@ -85,20 +85,21 @@ type fieldSpecial struct {
 
 var fsCache = map[reflect.Type]*typeInfo{}
 
-func tinfo(t reflect.Type) *typeInfo {
+func tinfo(t reflect.Type, flags uint) *typeInfo {
 	if c, ok := fsCache[t]; ok {
 		return c
 	}
-	ret := &typeInfo{}
+	ret := &typeInfo{flags: flags}
 	ret.kind = t.Kind()
 	switch ret.kind {
 	case reflect.Struct:
 		n := t.NumField()
 		ret.fields = make([]fieldSpecial, n)
 		for i := 0; i < n; i++ {
+			flags := uint(0)
 			for _, t := range strings.Split(t.Field(i).Tag.Get("x3t"), ",") {
 				if t == "len32" {
-					ret.fields[i].flags |= len32
+					flags |= len32
 				} else if strings.HasPrefix(t, "sect") {
 					x := strings.Split(t, ":")
 					if len(x) != 3 {
@@ -110,93 +111,126 @@ func tinfo(t reflect.Type) *typeInfo {
 					ret.fields[i].sectOptional = true
 				}
 			}
-			ret.fields[i].ti = tinfo(t.Field(i).Type)
+			ret.fields[i].ti = tinfo(t.Field(i).Type, flags)
 		}
 	case reflect.Slice, reflect.Array:
-		ret.slTi = tinfo(t.Elem())
+		ret.slTi = tinfo(t.Elem(), 0)
 	}
 	fsCache[t] = ret
 	return ret
 }
 
-func decode(r *bufio.Reader, flags uint, v reflect.Value) error {
-	ti := tinfo(v.Type())
-	return ti.decode(r, flags, v)
+func decode16(r *bufio.Reader) (int16, error) {
+	d := make([]byte, 2, 2)
+	_, err := io.ReadFull(r, d)
+	if err != nil {
+		return 0, err
+	}
+	return int16(uint16(d[1]) | uint16(d[0])<<8), nil
 }
 
-func (ti *typeInfo) decode(r *bufio.Reader, flags uint, v reflect.Value) error {
+func decode32(r *bufio.Reader) (int32, error) {
+	d := make([]byte, 4)
+	_, err := io.ReadFull(r, d)
+	if err != nil {
+		return 0, err
+	}
+	return int32(uint32(d[3]) | uint32(d[2])<<8 | uint32(d[1])<<16 | uint32(d[0])<<24), nil
+}
+
+func (ti *typeInfo) decodev(r *bufio.Reader, v interface{}) error {
 	// Pretty simple, integer types are the right size and big
 	// endian, strings are nul-terminated. no alignment
 	// considerations.
 
-	if v.CanAddr() {
-		if dc, ok := v.Addr().Interface().(decoder); ok {
-			return dc.Decode(r)
-		}
+	if dc, ok := v.(decoder); ok {
+		return dc.Decode(r)
 	}
 
+	var err error
+
 	switch ti.kind {
+	case reflect.Slice:
+		var sliceLen int
+		if (ti.flags & len32) != 0 {
+			x, err := decode32(r)
+			if err != nil {
+				return err
+			}
+			sliceLen = int(x)
+		} else {
+			x, err := decode16(r)
+			if err != nil {
+				return err
+			}
+			sliceLen = int(x)
+		}
+		switch v := v.(type) {
+		case *[]int16:
+			*v = make([]int16, sliceLen, sliceLen)
+			for i := range *v {
+				(*v)[i], err = decode16(r)
+			}
+		case *[]int32:
+			*v = make([]int32, sliceLen, sliceLen)
+			for i := range *v {
+				(*v)[i], err = decode32(r)
+			}
+		default:
+			val := reflect.Indirect(reflect.ValueOf(v))
+			val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
+			for i := 0; i < sliceLen; i++ {
+				err = ti.slTi.decodev(r, val.Index(i).Addr().Interface())
+			}
+		}
+		return err
 	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
+		val := reflect.Indirect(reflect.ValueOf(v))
+		for i := 0; i < val.NumField(); i++ {
 			f := &ti.fields[i]
 			if f.sectStart != "" {
 				err := sect(r, f.sectStart, f.sectEnd, f.sectOptional, func() error {
-					return f.ti.decode(r, f.flags, v.Field(i))
+					return f.ti.decodev(r, val.Field(i).Addr().Interface())
 				})
 				if err != nil {
 					return err
 				}
 			} else {
-				err := f.ti.decode(r, f.flags, v.Field(i))
+				err := f.ti.decodev(r, val.Field(i).Addr().Interface())
 				if err != nil {
 					return err
 				}
 			}
 		}
-	case reflect.String:
+		return nil
+	case reflect.Array:
+		val := reflect.Indirect(reflect.ValueOf(v))
+		// XXX - should we just slice it and let this function deal with it?
+		for i := 0; i < val.Len(); i++ {
+			err = ti.slTi.decodev(r, val.Index(i).Addr().Interface())
+		}
+		return err
+	}
+
+	switch v := v.(type) {
+	case *int16:
+		*v, err = decode16(r)
+	case *int32:
+		*v, err = decode32(r)
+	case *string:
 		s, err := r.ReadBytes(0)
 		if err != nil {
 			return err
 		}
-		v.SetString(string(s[:len(s)-1]))
-	case reflect.Slice:
-		l := 0
-		if (flags & len32) != 0 {
-			var x int32
-			err := decodeVal(r, 0, &x)
-			if err != nil {
-				return err
-			}
-			l = int(x)
-		} else {
-			var x int16
-			err := decodeVal(r, 0, &x)
-			if err != nil {
-				return err
-			}
-			l = int(x)
-		}
-		v.Set(reflect.MakeSlice(v.Type(), l, l))
-		for i := 0; i < l; i++ {
-			err := ti.slTi.decode(r, 0, v.Index(i))
-			if err != nil {
-				return err
-			}
-		}
-	case reflect.Array:
-		for i := 0; i < v.Len(); i++ {
-			err := ti.slTi.decode(r, 0, v.Index(i))
-			if err != nil {
-				return err
-			}
-		}
+		*v = string(s)
+	case *float32:
+		var x int32
+		x, err = decode32(r)
+		*v = math.Float32frombits(uint32(x))
 	default:
-		err := binary.Read(r, binary.BigEndian, v.Addr().Interface())
-		if err != nil {
-			return err
-		}
+		panic("unknown type")
 	}
-	return nil
+	return err
 }
 
 type Bob struct {
@@ -218,7 +252,7 @@ type mat6Value struct {
 }
 
 func (m *mat6Value) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, 0, &m.Hdr)
+	err := decodeVal(r, &m.Hdr)
 	if err != nil {
 		return err
 	}
@@ -236,9 +270,9 @@ func (m *mat6Value) Decode(r *bufio.Reader) error {
 	case 8:
 		data = &m.s
 	default:
-		return fmt.Errorf("unknown mat6 type")
+		return fmt.Errorf("unknown mat6 type %x", m.Hdr.Type)
 	}
-	return decodeVal(r, 0, data)
+	return decodeVal(r, data)
 }
 
 type Mat6Pair struct {
@@ -277,7 +311,7 @@ type material6 struct {
 }
 
 func (m *material6) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, 0, &m.matHdr)
+	err := decodeVal(r, &m.matHdr)
 	if err != nil {
 		return err
 	}
@@ -286,7 +320,7 @@ func (m *material6) Decode(r *bufio.Reader) error {
 	} else {
 		m.mat = &mat6small{}
 	}
-	return decodeVal(r, 0, m.mat)
+	return decodeVal(r, m.mat)
 }
 
 type point struct {
@@ -297,7 +331,7 @@ type point struct {
 }
 
 func (p *point) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, 0, &p.hdr)
+	err := decodeVal(r, &p.hdr)
 	if err != nil {
 		return err
 	}
@@ -314,7 +348,7 @@ func (p *point) Decode(r *bufio.Reader) error {
 	}
 	p.values = make([]int32, sz)
 	for i := range p.values {
-		err := decodeVal(r, 0, &p.values[i])
+		err := decodeVal(r, &p.values[i])
 		if err != nil {
 			return err
 		}
@@ -359,14 +393,14 @@ type part struct {
 }
 
 func (p *part) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, 0, &p.Hdr)
+	err := decodeVal(r, &p.Hdr)
 	if err != nil {
 		return err
 	}
 	if (p.Hdr.Flags & 0x10000000) != 0 {
-		err = decodeVal(r, 0, &p.x3)
+		err = decodeVal(r, &p.x3)
 	} else {
-		err = decodeVal(r, 0, &p.notx3)
+		err = decodeVal(r, &p.notx3)
 	}
 	return err
 }
