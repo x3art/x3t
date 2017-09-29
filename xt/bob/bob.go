@@ -32,13 +32,15 @@ type bobReader struct {
 	eof    bool
 }
 
+var bobTinfo = tinfo(reflect.TypeOf(Bob{}), 0)
+
 func Read(r io.Reader) {
 	br := &bobReader{source: r}
 
 	b := Bob{}
 	t := time.Now()
 	err := br.sect(sTag{'B', 'O', 'B', '1'}, sTag{'/', 'B', 'O', 'B'}, false, func() error {
-		return tinfo(reflect.TypeOf(b), 0).decodev(br, &b)
+		return bobTinfo.decodev(br, &b)
 	})
 	fmt.Printf("T: %v\n", time.Since(t))
 	if err != nil {
@@ -73,17 +75,6 @@ func (r *bobReader) ensure(l int) error {
 	}
 	r.w = r.buffer[:n+resid]
 	return nil
-}
-
-func (r *bobReader) Read(data []byte) (int, error) {
-	l := len(data)
-	err := r.ensure(l)
-	if err != nil {
-		return 0, err
-	}
-	copy(data, r.w)
-	r.w = r.w[l:]
-	return l, nil
 }
 
 // The only time we peek at bytes forward is when sections are
@@ -124,10 +115,6 @@ func (r *bobReader) sect(s, e sTag, optional bool, f func() error) error {
 		return fmt.Errorf("unexpected [%s]%v, expected [%s]", r.w[:4], r.w[:4], e)
 	}
 	return nil
-}
-
-func (r *bobReader) decodeVal(data interface{}) error {
-	return tinfo(reflect.TypeOf(data).Elem(), 0).decodev(r, data)
 }
 
 const (
@@ -211,6 +198,11 @@ func (r *bobReader) decode32() (int32, error) {
 	return ret, nil
 }
 
+func (r *bobReader) decodef32() (float32, error) {
+	x, err := r.decode32()
+	return math.Float32frombits(uint32(x)), err
+}
+
 func (r *bobReader) decodeString() (string, error) {
 	err := r.ensure(1)
 	if err != nil {
@@ -256,9 +248,7 @@ func (r *bobReader) arrsl(v interface{}) error {
 		}
 	case []float32:
 		for i := range v {
-			var x int32
-			x, err = r.decode32()
-			v[i] = math.Float32frombits(uint32(x))
+			v[i], err = r.decodef32()
 		}
 	default:
 		log.Fatalf("unknown array slice %T", v)
@@ -347,7 +337,7 @@ func (ti *typeInfo) decodev(r *bobReader, v interface{}) error {
 		x, err = r.decode32()
 		*v = math.Float32frombits(uint32(x))
 	default:
-		panic("unknown type")
+		log.Fatalf("unknown type %T", v)
 	}
 	return err
 }
@@ -370,28 +360,30 @@ type mat6Value struct {
 	s  string
 }
 
+var m6Value mat6Value
+var m6ValueHdrTinfo = tinfo(reflect.TypeOf(m6Value.Hdr), 0)
+
 func (m *mat6Value) Decode(r *bobReader) error {
-	err := r.decodeVal(&m.Hdr)
+	err := m6ValueHdrTinfo.decodev(r, &m.Hdr)
 	if err != nil {
 		return err
 	}
-	var data interface{}
 	// XXX - make constants, not magic numbers here.
 	switch m.Hdr.Type {
 	case 0:
-		data = &m.i
+		m.i, err = r.decode32()
 	case 1:
-		data = &m.b
+		m.b, err = r.decode32()
 	case 2:
-		data = &m.f
+		m.f, err = r.decodef32()
 	case 5:
-		data = &m.f4
+		err = r.arrsl(m.f4[:])
 	case 8:
-		data = &m.s
+		m.s, err = r.decodeString()
 	default:
 		return fmt.Errorf("unknown mat6 type %x", m.Hdr.Type)
 	}
-	return r.decodeVal(data)
+	return err
 }
 
 type Mat6Pair struct {
@@ -429,33 +421,38 @@ type material6 struct {
 	mat interface{}
 }
 
+var m6 material6
+var m6HdrTinfo = tinfo(reflect.TypeOf(m6.matHdr), 0)
+var m6bigTinfo = tinfo(reflect.TypeOf(mat6big{}), 0)
+var m6smallTinfo = tinfo(reflect.TypeOf(mat6small{}), 0)
+
 func (m *material6) Decode(r *bobReader) error {
-	err := r.decodeVal(&m.matHdr)
+	err := m6HdrTinfo.decodev(r, &m.matHdr)
 	if err != nil {
 		return err
 	}
 	if m.matHdr.Flags == matFlagBig {
 		m.mat = &mat6big{}
+		return m6bigTinfo.decodev(r, m.mat)
 	} else {
 		m.mat = &mat6small{}
+		return m6smallTinfo.decodev(r, m.mat)
 	}
-	return r.decodeVal(m.mat)
 }
 
 type point struct {
-	hdr struct {
-		Type int16
-	}
+	typ    int16
 	values []int32
 }
 
 func (p *point) Decode(r *bobReader) error {
-	err := r.decodeVal(&p.hdr)
+	t, err := r.decode16()
 	if err != nil {
 		return err
 	}
+	p.typ = t
 	sz := 0
-	switch p.hdr.Type {
+	switch p.typ {
 	case 0x1f:
 		sz = 11
 	case 0x1b:
@@ -463,11 +460,11 @@ func (p *point) Decode(r *bobReader) error {
 	case 0x19:
 		sz = 7
 	default:
-		return fmt.Errorf("unknown point type %d", p.hdr.Type)
+		return fmt.Errorf("unknown point type %d", p.typ)
 	}
 	p.values = make([]int32, sz)
 	for i := range p.values {
-		err := r.decodeVal(&p.values[i])
+		p.values[i], err = r.decode32()
 		if err != nil {
 			return err
 		}
@@ -498,28 +495,34 @@ type faceListX3 struct {
 	UVList        []uv       `x3t:"len32"`
 }
 
-type part struct {
-	Hdr struct {
-		Flags int32
-	}
-	x3 struct {
-		FacesX3 []faceListX3
-		X3Vals  [10]int32
-	}
-	notx3 struct {
-		Faces []faceList
-	}
+type partX3 struct {
+	FacesX3 []faceListX3
+	X3Vals  [10]int32
 }
 
+type partNotX3 struct {
+	Faces []faceList
+}
+
+type part struct {
+	flags int32
+	x3    partX3
+	notx3 partNotX3
+}
+
+var px3Tinfo = tinfo(reflect.TypeOf(partX3{}), 0)
+var pnx3Tinfo = tinfo(reflect.TypeOf(partNotX3{}), 0)
+
 func (p *part) Decode(r *bobReader) error {
-	err := r.decodeVal(&p.Hdr)
+	f, err := r.decode32()
 	if err != nil {
 		return err
 	}
-	if (p.Hdr.Flags & 0x10000000) != 0 {
-		err = r.decodeVal(&p.x3)
+	p.flags = f
+	if (p.flags & 0x10000000) != 0 {
+		err = px3Tinfo.decodev(r, &p.x3)
 	} else {
-		err = r.decodeVal(&p.notx3)
+		err = pnx3Tinfo.decodev(r, &p.notx3)
 	}
 	return err
 }
