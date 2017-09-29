@@ -183,6 +183,7 @@ func (r *bobReader) decode16() (int16, error) {
 	if err != nil {
 		return 0, err
 	}
+	_ = r.w[1]
 	ret := int16(uint16(r.w[1]) | uint16(r.w[0])<<8)
 	r.w = r.w[2:]
 	return ret, nil
@@ -193,6 +194,7 @@ func (r *bobReader) decode32() (int32, error) {
 	if err != nil {
 		return 0, err
 	}
+	_ = r.w[3]
 	ret := int32(uint32(r.w[3]) | uint32(r.w[2])<<8 | uint32(r.w[1])<<16 | uint32(r.w[0])<<24)
 	r.w = r.w[4:]
 	return ret, nil
@@ -297,10 +299,13 @@ func (ti *typeInfo) decodev(r *bobReader, v interface{}) error {
 			val := reflect.Indirect(reflect.ValueOf(v))
 			val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
 			for i := 0; i < sliceLen; i++ {
-				err = ti.slTi.decodev(r, val.Index(i).Addr().Interface())
+				err := ti.slTi.decodev(r, val.Index(i).Addr().Interface())
+				if err != nil {
+					return err
+				}
 			}
+			return nil
 		}
-		return err
 	case reflect.Struct:
 		val := reflect.Indirect(reflect.ValueOf(v))
 		for i := 0; i < val.NumField(); i++ {
@@ -321,8 +326,21 @@ func (ti *typeInfo) decodev(r *bobReader, v interface{}) error {
 		}
 		return nil
 	case reflect.Array:
-		val := reflect.Indirect(reflect.ValueOf(v))
-		return r.arrsl(val.Slice(0, val.Len()).Interface())
+		switch v := v.(type) {
+		case *[10]int32:
+			return r.arrsl(v[:])
+		case *[4]int32:
+			return r.arrsl(v[:])
+		case *[6]float32:
+			return r.arrsl(v[:])
+		default:
+			log.Fatalf("Special case array type  %T", v)
+		}
+		/*
+			// This is no longer necessary, it should have been special cased above.
+			val := reflect.Indirect(reflect.ValueOf(v))
+			return r.arrsl(val.Slice(0, val.Len()).Interface())
+		*/
 	}
 
 	switch v := v.(type) {
@@ -360,7 +378,7 @@ type mat6Value struct {
 
 func (m *mat6Value) Decode(r *bobReader) error {
 	var err error
-	m.Name, err = r.decodeString()
+	m.Name, _ = r.decodeString()
 	m.Type, err = r.decode16()
 	if err != nil {
 		return err
@@ -421,7 +439,7 @@ var m6smallTinfo = tinfo(reflect.TypeOf(mat6small{}), 0)
 
 func (m *material6) Decode(r *bobReader) error {
 	var err error
-	m.Index, err = r.decode16()
+	m.Index, _ = r.decode16()
 	m.Flags, err = r.decode32()
 	if err != nil {
 		return err
@@ -437,7 +455,7 @@ func (m *material6) Decode(r *bobReader) error {
 
 type point struct {
 	typ    int16
-	values []int32
+	values [11]int32
 }
 
 func (p *point) Decode(r *bobReader) error {
@@ -457,8 +475,7 @@ func (p *point) Decode(r *bobReader) error {
 	default:
 		return fmt.Errorf("unknown point type %d", p.typ)
 	}
-	p.values = make([]int32, sz)
-	return r.arrsl(p.values)
+	return r.arrsl(p.values[:sz])
 }
 
 type weight struct {
