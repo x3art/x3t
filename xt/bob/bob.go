@@ -1,7 +1,7 @@
 package bob
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -15,13 +15,31 @@ import (
  * Whoever designed this "binary" format should take a hard look at
  * himself in the mirror. Mixing 32 bit and 16 bit array sizes and
  * special casing types we decode to by flags...
+ *
+ * We could almost use encoding/binary for this. If it weren't for the
+ * bloody 0-terminated strings, they screw everything up.
+ * Also, bufio would be nice, except that handling short reads from
+ * bufio made things 3-4 time slower (why bufio gives us short reads
+ * for 4 byte reads is...).
  */
 
+type sTag [4]byte
+
+type bobReader struct {
+	source io.Reader
+	buffer [4096]byte
+	w      []byte
+	eof    bool
+}
+
 func Read(r io.Reader) {
-	br := bufio.NewReader(r)
+	br := &bobReader{source: r}
+
 	b := Bob{}
 	t := time.Now()
-	err := sect(br, "BOB1", "/BOB", false, func() error { return decodeVal(br, &b) })
+	err := br.sect(sTag{'B', 'O', 'B', '1'}, sTag{'/', 'B', 'O', 'B'}, false, func() error {
+		return tinfo(reflect.TypeOf(b), 0).decodev(br, &b)
+	})
 	fmt.Printf("T: %v\n", time.Since(t))
 	if err != nil {
 		log.Fatal(err)
@@ -30,34 +48,85 @@ func Read(r io.Reader) {
 	return
 }
 
-func sect(r *bufio.Reader, s, e string, optional bool, f func() error) error {
-	hdr, err := r.Peek(4)
+// Ensure that there are at least l bytes in the buffer.
+func (r *bobReader) ensure(l int) error {
+	if len(r.w) >= l {
+		return nil
+	}
+	if r.eof {
+		return io.EOF
+	}
+	resid := len(r.w)
+	if resid != 0 {
+		copy(r.buffer[:resid], r.w)
+	}
+	n, err := r.source.Read(r.buffer[resid:])
+	if err == io.EOF {
+		r.eof = true
+		if n+resid < l {
+			return io.EOF
+		}
+		err = nil
+	}
 	if err != nil {
 		return err
 	}
-	if string(hdr) != s {
+	r.w = r.buffer[:n+resid]
+	return nil
+}
+
+func (r *bobReader) Read(data []byte) (int, error) {
+	l := len(data)
+	err := r.ensure(l)
+	if err != nil {
+		return 0, err
+	}
+	copy(data, r.w)
+	r.w = r.w[l:]
+	return l, nil
+}
+
+// The only time we peek at bytes forward is when sections are
+// optional, but any time we don't find an optional section the next
+// thing read will be either another section start or a section end.
+func (r *bobReader) matchTag(expect sTag) (bool, error) {
+	err := r.ensure(4)
+	if err != nil {
+		return false, err
+	}
+	match := r.w[0] == expect[0] && r.w[1] == expect[1] && r.w[2] == expect[2] && r.w[3] == expect[3]
+	if match {
+		r.w = r.w[4:]
+	}
+	return match, nil
+}
+
+func (r *bobReader) sect(s, e sTag, optional bool, f func() error) error {
+	match, err := r.matchTag(s)
+	if err != nil {
+		return err
+	}
+	if !match {
 		if optional {
 			return nil
 		}
-		return fmt.Errorf("unexpected [%s], expected [%s]", hdr, s)
-	} else {
-		_, err = r.Read(hdr)
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf("unexpected [%s], expected [%s]", r.w[:4], s)
 	}
 	err = f()
 	if err != nil {
 		return err
 	}
-	_, err = r.Read(hdr)
-	if string(hdr) != e {
-		return fmt.Errorf("unexpected [%s]%v, expected [%s]", hdr, hdr, e)
+	match, err = r.matchTag(e)
+	if err != nil {
+		return err
+	}
+	if !match {
+		return fmt.Errorf("unexpected [%s]%v, expected [%s]", r.w[:4], r.w[:4], e)
 	}
 	return nil
 }
 
-func decodeVal(r *bufio.Reader, data interface{}) error {
+func (r *bobReader) decodeVal(data interface{}) error {
 	return tinfo(reflect.TypeOf(data).Elem(), 0).decodev(r, data)
 }
 
@@ -66,7 +135,7 @@ const (
 )
 
 type decoder interface {
-	Decode(*bufio.Reader) error
+	Decode(*bobReader) error
 }
 
 type typeInfo struct {
@@ -77,8 +146,9 @@ type typeInfo struct {
 }
 
 type fieldSpecial struct {
-	sectStart    string
-	sectEnd      string
+	sect         bool
+	sectStart    sTag
+	sectEnd      sTag
 	sectOptional bool
 	ti           *typeInfo
 }
@@ -105,8 +175,9 @@ func tinfo(t reflect.Type, flags uint) *typeInfo {
 					if len(x) != 3 {
 						panic(fmt.Errorf("sect tag bad: [%s]", t))
 					}
-					ret.fields[i].sectStart = x[1]
-					ret.fields[i].sectEnd = x[2]
+					ret.fields[i].sect = true
+					copy(ret.fields[i].sectStart[:], x[1])
+					copy(ret.fields[i].sectEnd[:], x[2])
 				} else if t == "optional" {
 					ret.fields[i].sectOptional = true
 				}
@@ -120,39 +191,73 @@ func tinfo(t reflect.Type, flags uint) *typeInfo {
 	return ret
 }
 
-func decode16(r *bufio.Reader) (int16, error) {
-	d := make([]byte, 2, 2)
-	_, err := io.ReadFull(r, d)
+func (r *bobReader) decode16() (int16, error) {
+	err := r.ensure(2)
 	if err != nil {
 		return 0, err
 	}
-	return int16(uint16(d[1]) | uint16(d[0])<<8), nil
+	ret := int16(uint16(r.w[1]) | uint16(r.w[0])<<8)
+	r.w = r.w[2:]
+	return ret, nil
 }
 
-func decode32(r *bufio.Reader) (int32, error) {
-	d := make([]byte, 4)
-	_, err := io.ReadFull(r, d)
+func (r *bobReader) decode32() (int32, error) {
+	err := r.ensure(4)
 	if err != nil {
 		return 0, err
 	}
-	return int32(uint32(d[3]) | uint32(d[2])<<8 | uint32(d[1])<<16 | uint32(d[0])<<24), nil
+	ret := int32(uint32(r.w[3]) | uint32(r.w[2])<<8 | uint32(r.w[1])<<16 | uint32(r.w[0])<<24)
+	r.w = r.w[4:]
+	return ret, nil
 }
 
-func arrsl(r *bufio.Reader, v interface{}) error {
+func (r *bobReader) decodeString() (string, error) {
+	err := r.ensure(1)
+	if err != nil {
+		return "", err
+	}
+	off := bytes.IndexByte(r.w, 0)
+	if off != -1 {
+		// trivial case
+		s := string(r.w[:off])
+		r.w = r.w[off+1:]
+		return s, nil
+	}
+	done := false
+	ret := make([]byte, 0)
+	for !done {
+		err := r.ensure(1)
+		if err != nil {
+			return "", err
+		}
+		off := bytes.IndexByte(r.w, 0)
+		if off != -1 {
+			done = true
+			ret = append(ret, r.w[:off]...)
+			r.w = r.w[off+1:]
+		} else {
+			ret = append(ret, r.w...)
+			r.w = r.w[len(r.w):]
+		}
+	}
+	return string(ret), nil
+}
+
+func (r *bobReader) arrsl(v interface{}) error {
 	var err error
 	switch v := v.(type) {
 	case []int16:
 		for i := range v {
-			v[i], err = decode16(r)
+			v[i], err = r.decode16()
 		}
 	case []int32:
 		for i := range v {
-			v[i], err = decode32(r)
+			v[i], err = r.decode32()
 		}
 	case []float32:
 		for i := range v {
 			var x int32
-			x, err = decode32(r)
+			x, err = r.decode32()
 			v[i] = math.Float32frombits(uint32(x))
 		}
 	default:
@@ -161,7 +266,7 @@ func arrsl(r *bufio.Reader, v interface{}) error {
 	return err
 }
 
-func (ti *typeInfo) decodev(r *bufio.Reader, v interface{}) error {
+func (ti *typeInfo) decodev(r *bobReader, v interface{}) error {
 	// Pretty simple, integer types are the right size and big
 	// endian, strings are nul-terminated. no alignment
 	// considerations.
@@ -176,13 +281,13 @@ func (ti *typeInfo) decodev(r *bufio.Reader, v interface{}) error {
 	case reflect.Slice:
 		var sliceLen int
 		if (ti.flags & len32) != 0 {
-			x, err := decode32(r)
+			x, err := r.decode32()
 			if err != nil {
 				return err
 			}
 			sliceLen = int(x)
 		} else {
-			x, err := decode16(r)
+			x, err := r.decode16()
 			if err != nil {
 				return err
 			}
@@ -191,13 +296,13 @@ func (ti *typeInfo) decodev(r *bufio.Reader, v interface{}) error {
 		switch v := v.(type) {
 		case *[]int16:
 			*v = make([]int16, sliceLen, sliceLen)
-			return arrsl(r, *v)
+			return r.arrsl(*v)
 		case *[]int32:
 			*v = make([]int32, sliceLen, sliceLen)
-			return arrsl(r, *v)
+			return r.arrsl(*v)
 		case *[]float32:
 			*v = make([]float32, sliceLen, sliceLen)
-			return arrsl(r, *v)
+			return r.arrsl(*v)
 		default:
 			val := reflect.Indirect(reflect.ValueOf(v))
 			val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
@@ -210,8 +315,8 @@ func (ti *typeInfo) decodev(r *bufio.Reader, v interface{}) error {
 		val := reflect.Indirect(reflect.ValueOf(v))
 		for i := 0; i < val.NumField(); i++ {
 			f := &ti.fields[i]
-			if f.sectStart != "" {
-				err := sect(r, f.sectStart, f.sectEnd, f.sectOptional, func() error {
+			if f.sect {
+				err := r.sect(f.sectStart, f.sectEnd, f.sectOptional, func() error {
 					return f.ti.decodev(r, val.Field(i).Addr().Interface())
 				})
 				if err != nil {
@@ -227,23 +332,19 @@ func (ti *typeInfo) decodev(r *bufio.Reader, v interface{}) error {
 		return nil
 	case reflect.Array:
 		val := reflect.Indirect(reflect.ValueOf(v))
-		return arrsl(r, val.Slice(0, val.Len()).Interface())
+		return r.arrsl(val.Slice(0, val.Len()).Interface())
 	}
 
 	switch v := v.(type) {
 	case *int16:
-		*v, err = decode16(r)
+		*v, err = r.decode16()
 	case *int32:
-		*v, err = decode32(r)
+		*v, err = r.decode32()
 	case *string:
-		s, err := r.ReadBytes(0)
-		if err != nil {
-			return err
-		}
-		*v = string(s)
+		*v, err = r.decodeString()
 	case *float32:
 		var x int32
-		x, err = decode32(r)
+		x, err = r.decode32()
 		*v = math.Float32frombits(uint32(x))
 	default:
 		panic("unknown type")
@@ -269,8 +370,8 @@ type mat6Value struct {
 	s  string
 }
 
-func (m *mat6Value) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, &m.Hdr)
+func (m *mat6Value) Decode(r *bobReader) error {
+	err := r.decodeVal(&m.Hdr)
 	if err != nil {
 		return err
 	}
@@ -290,7 +391,7 @@ func (m *mat6Value) Decode(r *bufio.Reader) error {
 	default:
 		return fmt.Errorf("unknown mat6 type %x", m.Hdr.Type)
 	}
-	return decodeVal(r, data)
+	return r.decodeVal(data)
 }
 
 type Mat6Pair struct {
@@ -328,8 +429,8 @@ type material6 struct {
 	mat interface{}
 }
 
-func (m *material6) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, &m.matHdr)
+func (m *material6) Decode(r *bobReader) error {
+	err := r.decodeVal(&m.matHdr)
 	if err != nil {
 		return err
 	}
@@ -338,7 +439,7 @@ func (m *material6) Decode(r *bufio.Reader) error {
 	} else {
 		m.mat = &mat6small{}
 	}
-	return decodeVal(r, m.mat)
+	return r.decodeVal(m.mat)
 }
 
 type point struct {
@@ -348,8 +449,8 @@ type point struct {
 	values []int32
 }
 
-func (p *point) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, &p.hdr)
+func (p *point) Decode(r *bobReader) error {
+	err := r.decodeVal(&p.hdr)
 	if err != nil {
 		return err
 	}
@@ -366,7 +467,7 @@ func (p *point) Decode(r *bufio.Reader) error {
 	}
 	p.values = make([]int32, sz)
 	for i := range p.values {
-		err := decodeVal(r, &p.values[i])
+		err := r.decodeVal(&p.values[i])
 		if err != nil {
 			return err
 		}
@@ -410,15 +511,15 @@ type part struct {
 	}
 }
 
-func (p *part) Decode(r *bufio.Reader) error {
-	err := decodeVal(r, &p.Hdr)
+func (p *part) Decode(r *bobReader) error {
+	err := r.decodeVal(&p.Hdr)
 	if err != nil {
 		return err
 	}
 	if (p.Hdr.Flags & 0x10000000) != 0 {
-		err = decodeVal(r, &p.x3)
+		err = r.decodeVal(&p.x3)
 	} else {
-		err = decodeVal(r, &p.notx3)
+		err = r.decodeVal(&p.notx3)
 	}
 	return err
 }
