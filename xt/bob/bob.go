@@ -349,27 +349,24 @@ type Bob struct {
 }
 
 type mat6Value struct {
-	Hdr struct {
-		Name string
-		Type int16
-	}
-	b  int32
-	i  int32
-	f  float32
-	f4 [4]float32
-	s  string
+	Name string
+	Type int16
+	b    int32
+	i    int32
+	f    float32
+	f4   [4]float32
+	s    string
 }
 
-var m6Value mat6Value
-var m6ValueHdrTinfo = tinfo(reflect.TypeOf(m6Value.Hdr), 0)
-
 func (m *mat6Value) Decode(r *bobReader) error {
-	err := m6ValueHdrTinfo.decodev(r, &m.Hdr)
+	var err error
+	m.Name, err = r.decodeString()
+	m.Type, err = r.decode16()
 	if err != nil {
 		return err
 	}
 	// XXX - make constants, not magic numbers here.
-	switch m.Hdr.Type {
+	switch m.Type {
 	case 0:
 		m.i, err = r.decode32()
 	case 1:
@@ -381,7 +378,7 @@ func (m *mat6Value) Decode(r *bobReader) error {
 	case 8:
 		m.s, err = r.decodeString()
 	default:
-		return fmt.Errorf("unknown mat6 type %x", m.Hdr.Type)
+		return fmt.Errorf("unknown mat6 type %x", m.Type)
 	}
 	return err
 }
@@ -414,24 +411,22 @@ type mat6small struct {
 const matFlagBig = 0x2000000
 
 type material6 struct {
-	matHdr struct {
-		Index int16
-		Flags int32
-	}
-	mat interface{}
+	Index int16
+	Flags int32
+	mat   interface{}
 }
 
-var m6 material6
-var m6HdrTinfo = tinfo(reflect.TypeOf(m6.matHdr), 0)
 var m6bigTinfo = tinfo(reflect.TypeOf(mat6big{}), 0)
 var m6smallTinfo = tinfo(reflect.TypeOf(mat6small{}), 0)
 
 func (m *material6) Decode(r *bobReader) error {
-	err := m6HdrTinfo.decodev(r, &m.matHdr)
+	var err error
+	m.Index, err = r.decode16()
+	m.Flags, err = r.decode32()
 	if err != nil {
 		return err
 	}
-	if m.matHdr.Flags == matFlagBig {
+	if m.Flags == matFlagBig {
 		m.mat = &mat6big{}
 		return m6bigTinfo.decodev(r, m.mat)
 	} else {
@@ -463,13 +458,7 @@ func (p *point) Decode(r *bobReader) error {
 		return fmt.Errorf("unknown point type %d", p.typ)
 	}
 	p.values = make([]int32, sz)
-	for i := range p.values {
-		p.values[i], err = r.decode32()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return r.arrsl(p.values)
 }
 
 type weight struct {
