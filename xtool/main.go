@@ -76,10 +76,32 @@ func main() {
 				fmt.Fprintf(os.Stderr, "No such file: %s\n", args[2])
 				os.Exit(1)
 			}
-			_ = bob.Read(f)
+			_, err := bob.Read(f)
+			if err != nil {
+				log.Fatal(err)
+			}
 			f.Close()
 			fmt.Printf("T: %v\n", time.Since(t))
 		}
+	case "bobBench":
+		t := time.Now()
+		x.Map(func(d, f string) {
+			if strings.HasSuffix(f, ".bob") {
+				n := fmt.Sprintf("%s/%s", d, f)
+				f := x.Open(n)
+				if f == nil {
+					log.Fatalf("open: %s", n)
+				}
+				_, err := bob.Read(f)
+				if err != nil {
+					fmt.Printf("error: %s, %v\n", n, err)
+				} else {
+					fmt.Printf("ok: %s\n", n)
+				}
+				f.Close()
+			}
+		})
+		fmt.Printf("T: %v\n", time.Since(t))
 	default:
 		usage()
 	}
