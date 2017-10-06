@@ -77,6 +77,21 @@ func (r *bobReader) ensure(l int) error {
 	return nil
 }
 
+// Give us a potentially large buffer to consume
+func (r *bobReader) consume(l int) ([]byte, error) {
+	if l < len(r.buffer) {
+		err := r.ensure(l)
+		if err != nil {
+			return nil, err
+		}
+		ret := r.w[:l]
+		r.w = r.w[l:]
+		return ret, err
+	}
+	panic("not implemented yet")
+	// create slice len l, copy r.w to it, read the rest.
+}
+
 // The only time we peek at bytes forward is when sections are
 // optional, but any time we don't find an optional section the next
 // thing read will be either another section start or a section end.
@@ -222,31 +237,42 @@ func tdec(t reflect.Type, flags uint) decd {
 	return ret
 }
 
+func dec16(d []byte) int16 {
+	_ = d[1]
+	return int16(uint16(d[1]) | uint16(d[0])<<8)
+}
+
 func (r *bobReader) decode16() (int16, error) {
-	err := r.ensure(2)
+	d, err := r.consume(2)
 	if err != nil {
 		return 0, err
 	}
-	_ = r.w[1]
-	ret := int16(uint16(r.w[1]) | uint16(r.w[0])<<8)
-	r.w = r.w[2:]
-	return ret, nil
+	return dec16(d), nil
+}
+
+func dec32(d []byte) int32 {
+	_ = d[3]
+	return int32(uint32(d[3]) | uint32(d[2])<<8 | uint32(d[1])<<16 | uint32(d[0])<<24)
 }
 
 func (r *bobReader) decode32() (int32, error) {
-	err := r.ensure(4)
+	d, err := r.consume(4)
 	if err != nil {
 		return 0, err
 	}
-	_ = r.w[3]
-	ret := int32(uint32(r.w[3]) | uint32(r.w[2])<<8 | uint32(r.w[1])<<16 | uint32(r.w[0])<<24)
-	r.w = r.w[4:]
-	return ret, nil
+	return dec32(d), nil
+}
+
+func decf32(d []byte) float32 {
+	return math.Float32frombits(uint32(d[3]) | uint32(d[2])<<8 | uint32(d[1])<<16 | uint32(d[0])<<24)
 }
 
 func (r *bobReader) decodef32() (float32, error) {
-	x, err := r.decode32()
-	return math.Float32frombits(uint32(x)), err
+	d, err := r.consume(4)
+	if err != nil {
+		return 0, err
+	}
+	return decf32(d), nil
 }
 
 func (r *bobReader) decodeString() (string, error) {
@@ -297,26 +323,38 @@ func (dec decd) decodeSlice16(r *bobReader, v interface{}) error {
 	return dec.decodeSlice(r, v, int(l))
 }
 
-func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) (err error) {
+func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) error {
 	switch v := v.(type) {
 	case *[]int16:
 		*v = make([]int16, l, l)
-		for i := range *v {
-			(*v)[i], err = r.decode16()
+		d, err := r.consume(len(*v) * 2)
+		if err != nil {
+			return err
 		}
-		return
+		for i := range *v {
+			(*v)[i] = dec16(d[i*2:])
+		}
+		return nil
 	case *[]int32:
 		*v = make([]int32, l, l)
-		for i := range *v {
-			(*v)[i], err = r.decode32()
+		d, err := r.consume(len(*v) * 4)
+		if err != nil {
+			return err
 		}
-		return
+		for i := range *v {
+			(*v)[i] = dec32(d[i*4:])
+		}
+		return nil
 	case *[]float32:
 		*v = make([]float32, l, l)
-		for i := range *v {
-			(*v)[i], err = r.decodef32()
+		d, err := r.consume(len(*v) * 4)
+		if err != nil {
+			return err
 		}
-		return
+		for i := range *v {
+			(*v)[i] = decf32(d[i*4:])
+		}
+		return nil
 	default:
 		val := reflect.Indirect(reflect.ValueOf(v))
 		val.Set(reflect.MakeSlice(val.Type(), l, l))
@@ -331,23 +369,35 @@ func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) (err error) {
 	return nil
 }
 
-func decodeArray(r *bobReader, v interface{}) (err error) {
+func decodeArray(r *bobReader, v interface{}) error {
 	switch v := v.(type) {
 	case *[10]int32:
-		for i := range *v {
-			(*v)[i], err = r.decode32()
+		d, err := r.consume(len(v) * 4)
+		if err != nil {
+			return err
 		}
-		return
+		for i := range *v {
+			(*v)[i] = dec32(d[i*4:])
+		}
+		return nil
 	case *[4]int32:
-		for i := range *v {
-			(*v)[i], err = r.decode32()
+		d, err := r.consume(len(v) * 4)
+		if err != nil {
+			return err
 		}
-		return
+		for i := range *v {
+			(*v)[i] = dec32(d[i*4:])
+		}
+		return nil
 	case *[6]float32:
-		for i := range *v {
-			(*v)[i], err = r.decodef32()
+		d, err := r.consume(len(v) * 4)
+		if err != nil {
+			return err
 		}
-		return
+		for i := range *v {
+			(*v)[i] = decf32(d[i*4:])
+		}
+		return nil
 	default:
 		log.Fatalf("Special case array type  %T", v)
 	}
