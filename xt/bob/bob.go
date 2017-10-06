@@ -18,12 +18,15 @@ import (
  * We could almost use encoding/binary for this. If it weren't for the
  * bloody 0-terminated strings, they screw everything up.
  * Also, bufio would be nice, except that handling short reads from
- * bufio made things 3-4 time slower (why bufio gives us short reads
+ * bufio made things 3-4 times slower (why bufio gives us short reads
  * for 4 byte reads is...).
  */
 
 type sTag [4]byte
 
+// This keeps track of our reading. `buffer` is an internal buffer for
+// future reads. `w` is a window into the buffer that keeps track of
+// how much we've consumed.
 type bobReader struct {
 	source io.Reader
 	buffer [4096]byte
@@ -36,17 +39,18 @@ var bobDec = tdec(reflect.TypeOf(Bob{}), 0)
 func Read(r io.Reader) (*Bob, error) {
 	br := &bobReader{source: r}
 
-	b := Bob{}
+	b := &Bob{}
 	err := br.sect(sTag{'B', 'O', 'B', '1'}, sTag{'/', 'B', 'O', 'B'}, false, func() error {
-		return bobDec(br, &b)
+		return bobDec(br, b)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &b, nil
+	return b, nil
 }
 
-// Ensure that there are at least l bytes in the buffer.
+// Ensure that there are at least l bytes in the buffer. The bytes
+// are not consumed since they might be used for peeking.
 func (r *bobReader) ensure(l int) error {
 	if len(r.w) >= l {
 		return nil
