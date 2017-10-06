@@ -8,7 +8,6 @@ import (
 	"math"
 	"reflect"
 	"strings"
-	"time"
 )
 
 /*
@@ -34,20 +33,17 @@ type bobReader struct {
 
 var bobDec = tdec(reflect.TypeOf(Bob{}), 0)
 
-func Read(r io.Reader) {
+func Read(r io.Reader) *Bob {
 	br := &bobReader{source: r}
 
 	b := Bob{}
-	t := time.Now()
 	err := br.sect(sTag{'B', 'O', 'B', '1'}, sTag{'/', 'B', 'O', 'B'}, false, func() error {
 		return bobDec(br, &b)
 	})
-	fmt.Printf("T: %v\n", time.Since(t))
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%v\n", b.Info)
-	return
+	return &b
 }
 
 // Ensure that there are at least l bytes in the buffer.

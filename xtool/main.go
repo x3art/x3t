@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime/pprof"
 	"strings"
+	"time"
 	"x3t/xt"
 	"x3t/xt/bob"
 )
@@ -69,13 +70,15 @@ func main() {
 		}
 
 		for i := 0; i < 20; i++ {
+			t := time.Now()
 			f := x.Open(args[2])
 			if f == nil {
 				fmt.Fprintf(os.Stderr, "No such file: %s\n", args[2])
 				os.Exit(1)
 			}
-			bob.Read(f)
+			_ = bob.Read(f)
 			f.Close()
+			fmt.Printf("T: %v\n", time.Since(t))
 		}
 	default:
 		usage()
