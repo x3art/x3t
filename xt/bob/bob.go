@@ -33,7 +33,7 @@ type bobReader struct {
 
 var bobDec = tdec(reflect.TypeOf(Bob{}), 0)
 
-func Read(r io.Reader) *Bob {
+func Read(r io.Reader) (*Bob, error) {
 	br := &bobReader{source: r}
 
 	b := Bob{}
@@ -41,9 +41,9 @@ func Read(r io.Reader) *Bob {
 		return bobDec(br, &b)
 	})
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return &b
+	return &b, nil
 }
 
 // Ensure that there are at least l bytes in the buffer.
@@ -392,6 +392,24 @@ func decodeArray(r *bobReader, v interface{}) error {
 		}
 		for i := range *v {
 			(*v)[i] = decf32(d[i*4:])
+		}
+		return nil
+	case *[3]int16:
+		d, err := r.consume(len(v) * 2)
+		if err != nil {
+			return err
+		}
+		for i := range *v {
+			(*v)[i] = dec16(d[i*2:])
+		}
+		return nil
+	case *[2]int16:
+		d, err := r.consume(len(v) * 2)
+		if err != nil {
+			return err
+		}
+		for i := range *v {
+			(*v)[i] = dec16(d[i*2:])
 		}
 		return nil
 	default:
