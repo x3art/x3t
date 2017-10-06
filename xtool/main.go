@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime/pprof"
 	"strings"
 	"x3t/xt"
 	"x3t/xt/bob"
@@ -14,14 +15,30 @@ import (
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "Usage: xtool <X3 directory> <ls|cat> [args]\n")
+	fmt.Println(flag.NArg(), flag.NFlag())
 	os.Exit(1)
 }
+
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile `file`")
+var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
 
 func main() {
 	flag.Parse()
 	if flag.NArg() < 2 {
 		usage()
 	}
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
 	args := flag.Args()
 	x := xt.XFiles(args[0])
 
@@ -50,15 +67,30 @@ func main() {
 		if flag.NArg() != 3 {
 			usage()
 		}
-		f := x.Open(args[2])
-		if f == nil {
-			fmt.Fprintf(os.Stderr, "No such file: %s\n", args[2])
-			os.Exit(1)
+
+		for i := 0; i < 20; i++ {
+			f := x.Open(args[2])
+			if f == nil {
+				fmt.Fprintf(os.Stderr, "No such file: %s\n", args[2])
+				os.Exit(1)
+			}
+			bob.Read(f)
+			f.Close()
 		}
-		defer f.Close()
-		bob.Read(f)
 	default:
 		usage()
+	}
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal("could not create memory profile: ", err)
+		}
+		//		runtime.GC() // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			log.Fatal("could not write memory profile: ", err)
+		}
+		f.Close()
 	}
 }
 
