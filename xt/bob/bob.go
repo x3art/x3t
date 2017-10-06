@@ -281,27 +281,6 @@ func (r *bobReader) decodeString() (string, error) {
 	return string(ret), nil
 }
 
-func (r *bobReader) arrsl(v interface{}) error {
-	var err error
-	switch v := v.(type) {
-	case []int16:
-		for i := range v {
-			v[i], err = r.decode16()
-		}
-	case []int32:
-		for i := range v {
-			v[i], err = r.decode32()
-		}
-	case []float32:
-		for i := range v {
-			v[i], err = r.decodef32()
-		}
-	default:
-		log.Fatalf("unknown array slice %T", v)
-	}
-	return err
-}
-
 func (dec decd) decodeSlice32(r *bobReader, v interface{}) error {
 	l, err := r.decode32()
 	if err != nil {
@@ -318,17 +297,26 @@ func (dec decd) decodeSlice16(r *bobReader, v interface{}) error {
 	return dec.decodeSlice(r, v, int(l))
 }
 
-func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) error {
+func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) (err error) {
 	switch v := v.(type) {
 	case *[]int16:
 		*v = make([]int16, l, l)
-		return r.arrsl(*v)
+		for i := range *v {
+			(*v)[i], err = r.decode16()
+		}
+		return
 	case *[]int32:
 		*v = make([]int32, l, l)
-		return r.arrsl(*v)
+		for i := range *v {
+			(*v)[i], err = r.decode32()
+		}
+		return
 	case *[]float32:
 		*v = make([]float32, l, l)
-		return r.arrsl(*v)
+		for i := range *v {
+			(*v)[i], err = r.decodef32()
+		}
+		return
 	default:
 		val := reflect.Indirect(reflect.ValueOf(v))
 		val.Set(reflect.MakeSlice(val.Type(), l, l))
@@ -343,22 +331,26 @@ func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) error {
 	return nil
 }
 
-func decodeArray(r *bobReader, v interface{}) error {
+func decodeArray(r *bobReader, v interface{}) (err error) {
 	switch v := v.(type) {
 	case *[10]int32:
-		return r.arrsl(v[:])
+		for i := range *v {
+			(*v)[i], err = r.decode32()
+		}
+		return
 	case *[4]int32:
-		return r.arrsl(v[:])
+		for i := range *v {
+			(*v)[i], err = r.decode32()
+		}
+		return
 	case *[6]float32:
-		return r.arrsl(v[:])
+		for i := range *v {
+			(*v)[i], err = r.decodef32()
+		}
+		return
 	default:
 		log.Fatalf("Special case array type  %T", v)
 	}
-	/*
-		// This is no longer necessary, it should have been special cased above.
-		val := reflect.Indirect(reflect.ValueOf(v))
-		return r.arrsl(val.Slice(0, val.Len()).Interface())
-	*/
 	return nil
 }
 
@@ -398,7 +390,9 @@ func (m *mat6Value) Decode(r *bobReader) error {
 	case 2:
 		m.f, err = r.decodef32()
 	case 5:
-		err = r.arrsl(m.f4[:])
+		for i := range m.f4 {
+			m.f4[i], err = r.decodef32()
+		}
 	case 8:
 		m.s, err = r.decodeString()
 	default:
@@ -481,7 +475,10 @@ func (p *point) Decode(r *bobReader) error {
 	default:
 		return fmt.Errorf("unknown point type %d", p.typ)
 	}
-	return r.arrsl(p.values[:sz])
+	for i := 0; i < sz; i++ {
+		p.values[i], err = r.decode32()
+	}
+	return err
 }
 
 type weight struct {
