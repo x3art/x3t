@@ -32,7 +32,7 @@ type bobReader struct {
 	eof    bool
 }
 
-var bobTinfo = tinfo(reflect.TypeOf(Bob{}), 0)
+var bobDec = tdec(reflect.TypeOf(Bob{}), 0)
 
 func Read(r io.Reader) {
 	br := &bobReader{source: r}
@@ -40,7 +40,7 @@ func Read(r io.Reader) {
 	b := Bob{}
 	t := time.Now()
 	err := br.sect(sTag{'B', 'O', 'B', '1'}, sTag{'/', 'B', 'O', 'B'}, false, func() error {
-		return bobTinfo.decodev(br, &b)
+		return bobDec(br, &b)
 	})
 	fmt.Printf("T: %v\n", time.Since(t))
 	if err != nil {
@@ -125,54 +125,98 @@ type decoder interface {
 	Decode(*bobReader) error
 }
 
+type decd func(*bobReader, interface{}) error
+
 type typeInfo struct {
-	flags  uint
-	kind   reflect.Kind
-	slTi   *typeInfo
-	fields []fieldSpecial
+	dec decd
 }
 
-type fieldSpecial struct {
-	sect         bool
-	sectStart    sTag
-	sectEnd      sTag
-	sectOptional bool
-	ti           *typeInfo
-}
+var fsCache = map[reflect.Type]decd{}
 
-var fsCache = map[reflect.Type]*typeInfo{}
-
-func tinfo(t reflect.Type, flags uint) *typeInfo {
+func tdec(t reflect.Type, flags uint) decd {
 	if c, ok := fsCache[t]; ok {
 		return c
 	}
-	ret := &typeInfo{flags: flags}
-	ret.kind = t.Kind()
-	switch ret.kind {
-	case reflect.Struct:
-		n := t.NumField()
-		ret.fields = make([]fieldSpecial, n)
-		for i := 0; i < n; i++ {
-			flags := uint(0)
-			for _, t := range strings.Split(t.Field(i).Tag.Get("x3t"), ",") {
-				if t == "len32" {
-					flags |= len32
-				} else if strings.HasPrefix(t, "sect") {
-					x := strings.Split(t, ":")
-					if len(x) != 3 {
-						panic(fmt.Errorf("sect tag bad: [%s]", t))
+	var ret decd
+	if reflect.PtrTo(t).Implements(reflect.TypeOf((*decoder)(nil)).Elem()) {
+		ret = decDecoder
+	} else {
+		switch t.Kind() {
+		case reflect.Struct:
+			n := t.NumField()
+			fields := make([]decd, n)
+			for i := 0; i < n; i++ {
+				nflags := uint(0)
+				var sect, sectOptional bool
+				var sectStart, sectEnd sTag
+				for _, t := range strings.Split(t.Field(i).Tag.Get("x3t"), ",") {
+					if t == "len32" {
+						nflags |= len32
+					} else if strings.HasPrefix(t, "sect") {
+						x := strings.Split(t, ":")
+						if len(x) != 3 {
+							panic(fmt.Errorf("sect tag bad: [%s]", t))
+						}
+						sect = true
+						copy(sectStart[:], x[1])
+						copy(sectEnd[:], x[2])
+					} else if t == "optional" {
+						sectOptional = true
 					}
-					ret.fields[i].sect = true
-					copy(ret.fields[i].sectStart[:], x[1])
-					copy(ret.fields[i].sectEnd[:], x[2])
-				} else if t == "optional" {
-					ret.fields[i].sectOptional = true
+				}
+				fdec := tdec(t.Field(i).Type, nflags)
+				if sect {
+					fields[i] = func(r *bobReader, v interface{}) error {
+						return r.sect(sectStart, sectEnd, sectOptional, func() error {
+							return fdec(r, v)
+						})
+					}
+				} else {
+					fields[i] = fdec
 				}
 			}
-			ret.fields[i].ti = tinfo(t.Field(i).Type, flags)
+			ret = func(r *bobReader, v interface{}) error {
+				val := reflect.Indirect(reflect.ValueOf(v))
+				for i := range fields {
+					err := fields[i](r, val.Field(i).Addr().Interface())
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+		case reflect.Slice:
+			slDec := tdec(t.Elem(), 0)
+			if (flags & len32) != 0 {
+				ret = slDec.decodeSlice32
+			} else {
+				ret = slDec.decodeSlice16
+			}
+		case reflect.Array:
+			ret = decodeArray
+		case reflect.Int16:
+			ret = func(r *bobReader, v interface{}) (err error) {
+				*(v.(*int16)), err = r.decode16()
+				return
+			}
+		case reflect.Int32:
+			ret = func(r *bobReader, v interface{}) (err error) {
+				*(v.(*int32)), err = r.decode32()
+				return
+			}
+		case reflect.String:
+			ret = func(r *bobReader, v interface{}) (err error) {
+				*(v.(*string)), err = r.decodeString()
+				return
+			}
+		case reflect.Float32:
+			ret = func(r *bobReader, v interface{}) (err error) {
+				*(v.(*float32)), err = r.decodef32()
+				return
+			}
+		default:
+			log.Fatalf("unknown type %s", t.Name())
 		}
-	case reflect.Slice, reflect.Array:
-		ret.slTi = tinfo(t.Elem(), 0)
 	}
 	fsCache[t] = ret
 	return ret
@@ -258,106 +302,68 @@ func (r *bobReader) arrsl(v interface{}) error {
 	return err
 }
 
-func (ti *typeInfo) decodev(r *bobReader, v interface{}) error {
-	// Pretty simple, integer types are the right size and big
-	// endian, strings are nul-terminated. no alignment
-	// considerations.
-
-	if dc, ok := v.(decoder); ok {
-		return dc.Decode(r)
+func (dec decd) decodeSlice32(r *bobReader, v interface{}) error {
+	l, err := r.decode32()
+	if err != nil {
+		return err
 	}
+	return dec.decodeSlice(r, v, int(l))
+}
 
-	var err error
+func (dec decd) decodeSlice16(r *bobReader, v interface{}) error {
+	l, err := r.decode16()
+	if err != nil {
+		return err
+	}
+	return dec.decodeSlice(r, v, int(l))
+}
 
-	switch ti.kind {
-	case reflect.Slice:
-		var sliceLen int
-		if (ti.flags & len32) != 0 {
-			x, err := r.decode32()
-			if err != nil {
-				return err
-			}
-			sliceLen = int(x)
-		} else {
-			x, err := r.decode16()
-			if err != nil {
-				return err
-			}
-			sliceLen = int(x)
-		}
-		switch v := v.(type) {
-		case *[]int16:
-			*v = make([]int16, sliceLen, sliceLen)
-			return r.arrsl(*v)
-		case *[]int32:
-			*v = make([]int32, sliceLen, sliceLen)
-			return r.arrsl(*v)
-		case *[]float32:
-			*v = make([]float32, sliceLen, sliceLen)
-			return r.arrsl(*v)
-		default:
-			val := reflect.Indirect(reflect.ValueOf(v))
-			val.Set(reflect.MakeSlice(val.Type(), sliceLen, sliceLen))
-			for i := 0; i < sliceLen; i++ {
-				err := ti.slTi.decodev(r, val.Index(i).Addr().Interface())
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	case reflect.Struct:
+func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) error {
+	switch v := v.(type) {
+	case *[]int16:
+		*v = make([]int16, l, l)
+		return r.arrsl(*v)
+	case *[]int32:
+		*v = make([]int32, l, l)
+		return r.arrsl(*v)
+	case *[]float32:
+		*v = make([]float32, l, l)
+		return r.arrsl(*v)
+	default:
 		val := reflect.Indirect(reflect.ValueOf(v))
-		for i := 0; i < val.NumField(); i++ {
-			f := &ti.fields[i]
-			if f.sect {
-				err := r.sect(f.sectStart, f.sectEnd, f.sectOptional, func() error {
-					return f.ti.decodev(r, val.Field(i).Addr().Interface())
-				})
-				if err != nil {
-					return err
-				}
-			} else {
-				err := f.ti.decodev(r, val.Field(i).Addr().Interface())
-				if err != nil {
-					return err
-				}
+		val.Set(reflect.MakeSlice(val.Type(), l, l))
+		for i := 0; i < l; i++ {
+			err := dec(r, val.Index(i).Addr().Interface())
+			if err != nil {
+				return err
 			}
 		}
 		return nil
-	case reflect.Array:
-		switch v := v.(type) {
-		case *[10]int32:
-			return r.arrsl(v[:])
-		case *[4]int32:
-			return r.arrsl(v[:])
-		case *[6]float32:
-			return r.arrsl(v[:])
-		default:
-			log.Fatalf("Special case array type  %T", v)
-		}
-		/*
-			// This is no longer necessary, it should have been special cased above.
-			val := reflect.Indirect(reflect.ValueOf(v))
-			return r.arrsl(val.Slice(0, val.Len()).Interface())
-		*/
 	}
+	return nil
+}
 
+func decodeArray(r *bobReader, v interface{}) error {
 	switch v := v.(type) {
-	case *int16:
-		*v, err = r.decode16()
-	case *int32:
-		*v, err = r.decode32()
-	case *string:
-		*v, err = r.decodeString()
-	case *float32:
-		var x int32
-		x, err = r.decode32()
-		*v = math.Float32frombits(uint32(x))
+	case *[10]int32:
+		return r.arrsl(v[:])
+	case *[4]int32:
+		return r.arrsl(v[:])
+	case *[6]float32:
+		return r.arrsl(v[:])
 	default:
-		log.Fatalf("unknown type %T", v)
+		log.Fatalf("Special case array type  %T", v)
 	}
-	return err
+	/*
+		// This is no longer necessary, it should have been special cased above.
+		val := reflect.Indirect(reflect.ValueOf(v))
+		return r.arrsl(val.Slice(0, val.Len()).Interface())
+	*/
+	return nil
+}
+
+func decDecoder(r *bobReader, v interface{}) error {
+	return v.(decoder).Decode(r)
 }
 
 type Bob struct {
@@ -434,8 +440,8 @@ type material6 struct {
 	mat   interface{}
 }
 
-var m6bigTinfo = tinfo(reflect.TypeOf(mat6big{}), 0)
-var m6smallTinfo = tinfo(reflect.TypeOf(mat6small{}), 0)
+var m6bigDec = tdec(reflect.TypeOf(mat6big{}), 0)
+var m6smallDec = tdec(reflect.TypeOf(mat6small{}), 0)
 
 func (m *material6) Decode(r *bobReader) error {
 	var err error
@@ -446,10 +452,10 @@ func (m *material6) Decode(r *bobReader) error {
 	}
 	if m.Flags == matFlagBig {
 		m.mat = &mat6big{}
-		return m6bigTinfo.decodev(r, m.mat)
+		return m6bigDec(r, m.mat)
 	} else {
 		m.mat = &mat6small{}
-		return m6smallTinfo.decodev(r, m.mat)
+		return m6smallDec(r, m.mat)
 	}
 }
 
@@ -516,8 +522,8 @@ type part struct {
 	notx3 partNotX3
 }
 
-var px3Tinfo = tinfo(reflect.TypeOf(partX3{}), 0)
-var pnx3Tinfo = tinfo(reflect.TypeOf(partNotX3{}), 0)
+var px3Dec = tdec(reflect.TypeOf(partX3{}), 0)
+var pnx3Dec = tdec(reflect.TypeOf(partNotX3{}), 0)
 
 func (p *part) Decode(r *bobReader) error {
 	f, err := r.decode32()
@@ -526,9 +532,9 @@ func (p *part) Decode(r *bobReader) error {
 	}
 	p.flags = f
 	if (p.flags & 0x10000000) != 0 {
-		err = px3Tinfo.decodev(r, &p.x3)
+		err = px3Dec(r, &p.x3)
 	} else {
-		err = pnx3Tinfo.decodev(r, &p.notx3)
+		err = pnx3Dec(r, &p.notx3)
 	}
 	return err
 }
