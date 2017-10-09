@@ -555,8 +555,12 @@ func (p *point) Decode(r *bobReader) error {
 	default:
 		return fmt.Errorf("unknown point type %d", p.typ)
 	}
+	d, err := r.data(sz*4, true)
+	if err != nil {
+		return err
+	}
 	for i := 0; i < sz; i++ {
-		p.values[i], err = r.decode32()
+		p.values[i] = dec32(d[i*4:])
 	}
 	return err
 }
