@@ -20,21 +20,27 @@ import (
  * Also, bufio would be nice, except that handling short reads from
  * bufio made things 3-4 times slower (why bufio gives us short reads
  * for 4 byte reads is...).
+ *
+ * This package is written with manual buffers and so many things
+ * unrolled and not done generically because every single change from
+ * the original generic/reflect approach has been carefully benchmarked
+ * and going from 900ms to decode a mid-sized model to 30ms felt like
+ * a good trade-off for the increased complexity of this code.
  */
-
-type sTag [4]byte
 
 // This keeps track of our reading. `buffer` is an internal buffer for
 // future reads. `w` is a window into the buffer that keeps track of
 // how much we've consumed.
 type bobReader struct {
+	buffer [4096]byte
 	source io.Reader
 	eof    bool
 	w      []byte
-	buffer [4096]byte
 }
 
 var bobDec = tdec(reflect.TypeOf(Bob{}), 0)
+
+type sTag [4]byte
 
 func Read(r io.Reader) (*Bob, error) {
 	br := &bobReader{source: r}
