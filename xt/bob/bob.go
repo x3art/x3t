@@ -29,9 +29,9 @@ type sTag [4]byte
 // how much we've consumed.
 type bobReader struct {
 	source io.Reader
-	buffer [4096]byte
-	w      []byte
 	eof    bool
+	w      []byte
+	buffer [4096]byte
 }
 
 var bobDec = tdec(reflect.TypeOf(Bob{}), 0)
@@ -49,60 +49,72 @@ func Read(r io.Reader) (*Bob, error) {
 	return b, nil
 }
 
-// Ensure that there are at least l bytes in the buffer. The bytes
-// are not consumed since they might be used for peeking.
-func (r *bobReader) ensure(l int) error {
-	if len(r.w) >= l {
-		return nil
-	}
-	if r.eof {
-		return io.EOF
-	}
-	resid := len(r.w)
-	if resid != 0 {
-		copy(r.buffer[:resid], r.w)
-	}
-	n, err := r.source.Read(r.buffer[resid:])
-	if err == io.EOF {
-		r.eof = true
-		if n+resid < l {
-			return io.EOF
+// Data reader. We return a slice of an internal data buffer at least
+// `l` bytes long. If the request amount is larger than the internal
+// buffer the returned slice is allocated specifically for this
+// request and doesn't use the buffer.
+func (r *bobReader) data(l int, consume bool) ([]byte, error) {
+	if len(r.w) < l {
+		if l > len(r.buffer) {
+			ret := make([]byte, l, l)
+			copy(ret, r.w)
+			resid := len(r.w)
+			r.w = r.w[resid:]
+			if resid == l {
+				return ret, nil
+			}
+			n, err := r.source.Read(ret[resid:])
+			if n != l-resid {
+				err = io.EOF
+			}
+			if err != nil {
+				if err == io.EOF {
+					r.eof = true
+				}
+				return nil, err
+			}
+			return ret, nil
 		}
-		err = nil
+		if r.eof {
+			return nil, io.EOF
+		}
+		resid := len(r.w)
+		if resid != 0 {
+			copy(r.buffer[:], r.w)
+		}
+		n, err := r.source.Read(r.buffer[resid:])
+		if err != nil {
+			r.eof = err == io.EOF
+			if r.eof && n+resid >= l {
+				err = nil
+			} else {
+				return nil, err
+			}
+		}
+		r.w = r.buffer[:n+resid]
 	}
-	if err != nil {
-		return err
+	ret := r.w
+	if consume {
+		r.eat(l)
 	}
-	r.w = r.buffer[:n+resid]
-	return nil
+	return ret, nil
 }
 
-// Give us a potentially large buffer to consume
-func (r *bobReader) consume(l int) ([]byte, error) {
-	if l < len(r.buffer) {
-		err := r.ensure(l)
-		if err != nil {
-			return nil, err
-		}
-		ret := r.w[:l]
-		r.w = r.w[l:]
-		return ret, err
-	}
-	panic("not implemented yet")
-	// create slice len l, copy r.w to it, read the rest.
+func (r *bobReader) eat(l int) {
+	r.w = r.w[l:]
 }
 
 // The only time we peek at bytes forward is when sections are
 // optional, but any time we don't find an optional section the next
 // thing read will be either another section start or a section end.
 func (r *bobReader) matchTag(expect sTag) (bool, error) {
-	err := r.ensure(4)
+	b, err := r.data(4, false)
 	if err != nil {
 		return false, err
 	}
-	match := r.w[0] == expect[0] && r.w[1] == expect[1] && r.w[2] == expect[2] && r.w[3] == expect[3]
+	match := b[0] == expect[0] && b[1] == expect[1] && b[2] == expect[2] && b[3] == expect[3]
 	if match {
-		r.w = r.w[4:]
+		r.eat(4)
 	}
 	return match, nil
 }
@@ -243,7 +255,7 @@ func dec16(d []byte) int16 {
 }
 
 func (r *bobReader) decode16() (int16, error) {
-	d, err := r.consume(2)
+	d, err := r.data(2, true)
 	if err != nil {
 		return 0, err
 	}
@@ -256,7 +268,7 @@ func dec32(d []byte) int32 {
 }
 
 func (r *bobReader) decode32() (int32, error) {
-	d, err := r.consume(4)
+	d, err := r.data(4, true)
 	if err != nil {
 		return 0, err
 	}
@@ -268,7 +280,7 @@ func decf32(d []byte) float32 {
 }
 
 func (r *bobReader) decodef32() (float32, error) {
-	d, err := r.consume(4)
+	d, err := r.data(4, true)
 	if err != nil {
 		return 0, err
 	}
@@ -276,32 +288,32 @@ func (r *bobReader) decodef32() (float32, error) {
 }
 
 func (r *bobReader) decodeString() (string, error) {
-	err := r.ensure(1)
+	b, err := r.data(1, false)
 	if err != nil {
 		return "", err
 	}
-	off := bytes.IndexByte(r.w, 0)
+	off := bytes.IndexByte(b, 0)
 	if off != -1 {
 		// trivial case
-		s := string(r.w[:off])
-		r.w = r.w[off+1:]
+		s := string(b[:off])
+		r.eat(off + 1)
 		return s, nil
 	}
 	done := false
 	ret := make([]byte, 0)
 	for !done {
-		err := r.ensure(1)
+		b, err := r.data(1, false)
 		if err != nil {
 			return "", err
 		}
-		off := bytes.IndexByte(r.w, 0)
+		off := bytes.IndexByte(b, 0)
 		if off != -1 {
 			done = true
-			ret = append(ret, r.w[:off]...)
-			r.w = r.w[off+1:]
+			ret = append(ret, b[:off]...)
+			r.eat(off + 1)
 		} else {
-			ret = append(ret, r.w...)
-			r.w = r.w[len(r.w):]
+			ret = append(ret, b...)
+			r.eat(len(b))
 		}
 	}
 	return string(ret), nil
@@ -327,7 +339,7 @@ func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) error {
 	switch v := v.(type) {
 	case *[]int16:
 		*v = make([]int16, l, l)
-		d, err := r.consume(len(*v) * 2)
+		d, err := r.data(len(*v)*2, true)
 		if err != nil {
 			return err
 		}
@@ -337,7 +349,7 @@ func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) error {
 		return nil
 	case *[]int32:
 		*v = make([]int32, l, l)
-		d, err := r.consume(len(*v) * 4)
+		d, err := r.data(len(*v)*4, true)
 		if err != nil {
 			return err
 		}
@@ -347,7 +359,7 @@ func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) error {
 		return nil
 	case *[]float32:
 		*v = make([]float32, l, l)
-		d, err := r.consume(len(*v) * 4)
+		d, err := r.data(len(*v)*4, true)
 		if err != nil {
 			return err
 		}
@@ -372,7 +384,7 @@ func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) error {
 func decodeArray(r *bobReader, v interface{}) error {
 	switch v := v.(type) {
 	case *[10]int32:
-		d, err := r.consume(len(v) * 4)
+		d, err := r.data(len(v)*4, true)
 		if err != nil {
 			return err
 		}
@@ -381,7 +393,7 @@ func decodeArray(r *bobReader, v interface{}) error {
 		}
 		return nil
 	case *[4]int32:
-		d, err := r.consume(len(v) * 4)
+		d, err := r.data(len(v)*4, true)
 		if err != nil {
 			return err
 		}
@@ -390,7 +402,7 @@ func decodeArray(r *bobReader, v interface{}) error {
 		}
 		return nil
 	case *[6]float32:
-		d, err := r.consume(len(v) * 4)
+		d, err := r.data(len(v)*4, true)
 		if err != nil {
 			return err
 		}
@@ -399,7 +411,7 @@ func decodeArray(r *bobReader, v interface{}) error {
 		}
 		return nil
 	case *[3]int16:
-		d, err := r.consume(len(v) * 2)
+		d, err := r.data(len(v)*2, true)
 		if err != nil {
 			return err
 		}
@@ -408,7 +420,7 @@ func decodeArray(r *bobReader, v interface{}) error {
 		}
 		return nil
 	case *[2]int16:
-		d, err := r.consume(len(v) * 2)
+		d, err := r.data(len(v)*2, true)
 		if err != nil {
 			return err
 		}
