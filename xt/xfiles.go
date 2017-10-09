@@ -125,7 +125,7 @@ func (xf *Xfiles) parseCD(basename string) bool {
 	// figure out the logic of when they should be opened and
 	// closed.
 
-	s := bufio.NewScanner(&stupidDescrambler{r: fc, cookie: 219, addOff: true})
+	s := bufio.NewScanner(&stupidDescramblerOff{r: fc, cookie: 219, addOff: true})
 	s.Scan() // throw away the first line
 	off := int64(0)
 	for s.Scan() {
@@ -144,19 +144,32 @@ func (xf *Xfiles) parseCD(basename string) bool {
 	return true
 }
 
-// io.Reader wrapper to descramble various data.
 type stupidDescrambler struct {
+	io.ReadCloser
+	cookie byte
+}
+
+func (s *stupidDescrambler) Read(p []byte) (int, error) {
+	n, err := s.ReadCloser.Read(p)
+	c := s.cookie
+	for i := range p {
+		p[i] ^= c
+	}
+	return n, err
+}
+
+// io.Reader wrapper to descramble various data.
+type stupidDescramblerOff struct {
 	r      io.ReadCloser
 	off    int
 	cookie byte
 	addOff bool
 }
 
-func (d *stupidDescrambler) Read(p []byte) (int, error) {
+func (d *stupidDescramblerOff) Read(p []byte) (int, error) {
 	n, err := d.r.Read(p)
-	if err == nil {
+	if err == nil && d.addOff {
 		if d.addOff {
-			//_ = p[n-1]
 			for i := 0; i < n; i++ {
 				p[i] ^= d.cookie + byte(d.off+i)
 			}
@@ -171,7 +184,7 @@ func (d *stupidDescrambler) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func (d *stupidDescrambler) Close() error {
+func (d *stupidDescramblerOff) Close() error {
 	return d.r.Close()
 }
 
@@ -235,7 +248,7 @@ func (p pck) Open() io.ReadCloser {
 	// is in fact trivial to generate a header that will break
 	// this and no matter which comparison is done first, it will
 	// be the wrong one. This seems to work for now.
-	rs := &stupidDescrambler{r: r}
+	rs := &stupidDescramblerOff{r: r}
 	if cookie := (hdr[0] ^ 31); hdr[1]^cookie == 139 && hdr[2]^cookie == 8 {
 		// the first two bytes are a gzip header xor cookie.
 		rs.cookie = cookie
@@ -281,5 +294,5 @@ type bobOpener struct {
 }
 
 func (b bobOpener) Open() io.ReadCloser {
-	return &stupidDescrambler{r: b.xd.Open(), cookie: 51}
+	return &stupidDescrambler{b.xd.Open(), 51}
 }
