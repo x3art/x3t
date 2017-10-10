@@ -26,6 +26,10 @@ import (
  * the original generic/reflect approach has been carefully benchmarked
  * and going from 900ms to decode a mid-sized model to 30ms felt like
  * a good trade-off for the increased complexity of this code.
+ *
+ * There is still one big performance win to do here. We can know when a
+ * slice element has a static size and use that to fetch data for the
+ * whole element.
  */
 
 // This keeps track of our reading. `buffer` is an internal buffer for
@@ -159,10 +163,6 @@ type decoder interface {
 }
 
 type decd func(*bobReader, interface{}) error
-
-type typeInfo struct {
-	dec decd
-}
 
 var fsCache = map[reflect.Type]decd{}
 
@@ -575,7 +575,7 @@ func (p *point) Decode(r *bobReader) error {
 	for i := 0; i < sz; i++ {
 		p.values[i] = dec32(d[i*4:])
 	}
-	return err
+	return nil
 }
 
 type weight struct {
@@ -611,9 +611,8 @@ type partNotX3 struct {
 }
 
 type part struct {
-	flags int32
-	x3    partX3
-	notx3 partNotX3
+	Flags int32
+	p     interface{}
 }
 
 var px3Dec = tdec(reflect.TypeOf(partX3{}), 0)
@@ -624,11 +623,15 @@ func (p *part) Decode(r *bobReader) error {
 	if err != nil {
 		return err
 	}
-	p.flags = f
-	if (p.flags & 0x10000000) != 0 {
-		err = px3Dec(r, &p.x3)
+	p.Flags = f
+	if (f & 0x10000000) != 0 {
+		px := partX3{}
+		err = px3Dec(r, &px)
+		p.p = px
 	} else {
-		err = pnx3Dec(r, &p.notx3)
+		px := partNotX3{}
+		err = pnx3Dec(r, &px)
+		p.p = px
 	}
 	return err
 }
