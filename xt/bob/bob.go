@@ -180,9 +180,13 @@ func tdec(t reflect.Type, flags uint) decd {
 			fields := make([]decd, n)
 			for i := 0; i < n; i++ {
 				nflags := uint(0)
+				field := t.Field(i)
+				if field.PkgPath != "" {
+					continue
+				}
 				var sect, sectOptional bool
 				var sectStart, sectEnd sTag
-				for _, t := range strings.Split(t.Field(i).Tag.Get("x3t"), ",") {
+				for _, t := range strings.Split(field.Tag.Get("x3t"), ",") {
 					if t == "len32" {
 						nflags |= len32
 					} else if strings.HasPrefix(t, "sect") {
@@ -197,7 +201,7 @@ func tdec(t reflect.Type, flags uint) decd {
 						sectOptional = true
 					}
 				}
-				fdec := tdec(t.Field(i).Type, nflags)
+				fdec := tdec(field.Type, nflags)
 				if sect {
 					fields[i] = func(r *bobReader, v interface{}) error {
 						return r.sect(sectStart, sectEnd, sectOptional, func() error {
@@ -211,6 +215,9 @@ func tdec(t reflect.Type, flags uint) decd {
 			ret = func(r *bobReader, v interface{}) error {
 				val := reflect.Indirect(reflect.ValueOf(v))
 				for i := range fields {
+					if fields[i] == nil {
+						continue
+					}
 					err := fields[i](r, val.Field(i).Addr().Interface())
 					if err != nil {
 						return err
