@@ -158,6 +158,43 @@ func (t typeStr) Fname() string {
 	return "str"
 }
 
+type typeSect struct {
+	sectOptional       bool
+	sectStart, sectEnd [4]byte
+	el                 typeInfo
+	nofunc
+}
+
+func (t typeSect) Size() int {
+	if t.sectOptional || t.el.Size() == 0 {
+		return 0
+	}
+	return t.el.Size() + 8
+}
+
+func (t typeSect) Decode(out *gen, dest, buf string, nilErr bool) {
+	opt := "false"
+	if t.sectOptional {
+		opt = "true"
+	}
+	out.o("err = r.sect(sTag{%d, %d, %d, %d}, sTag{%d, %d, %d, %d}, %s, func() error {\n",
+		t.sectStart[0], t.sectStart[1], t.sectStart[2], t.sectStart[3],
+		t.sectEnd[0], t.sectEnd[1], t.sectEnd[2], t.sectEnd[3],
+		opt).i(1)
+	t.el.Decode(out, dest, buf, false)
+	out.o("return nil\n")
+	out.i(-1).o("})\n")
+	out.errRet(nilErr)
+}
+
+func (t typeSect) Name() string {
+	return fmt.Sprintf("sect(%s)", t.sectStart[:])
+}
+
+func (t typeSect) Fname() string {
+	return "sect"
+}
+
 type typeSlice struct {
 	el    typeInfo
 	len32 bool
@@ -376,46 +413,52 @@ func exprOpts(tag string) (ret *eo) {
 			ret.sectOptional = true
 		}
 	}
-	if ret.sect {
-		panic("no sects")
-	}
 	return
 }
 
-func (s *gen) resolveExpr(e ast.Expr, opts *eo) typeInfo {
+func (s *gen) resolveExpr(e ast.Expr, opts *eo) (ret typeInfo) {
 	switch t := e.(type) {
 	case *ast.Ident:
 		switch t.Name {
 		case "int16":
-			return typeI16{}
+			ret = typeI16{}
 		case "int32":
-			return typeI32{}
+			ret = typeI32{}
 		case "float32":
-			return typeF32{}
+			ret = typeF32{}
 		case "string":
-			return typeStr{}
+			ret = typeStr{}
 		default:
-			return s.resolveStruct(t.Name)
+			ret = s.resolveStruct(t.Name)
 		}
 	case *ast.ArrayType:
 		if t.Len == nil {
 			len32 := opts != nil && opts.len32
-			return typeSlice{s.resolveExpr(t.Elt, nil), len32}
+			ret = typeSlice{s.resolveExpr(t.Elt, nil), len32}
+		} else {
+			ls := t.Len.(*ast.BasicLit).Value
+			l, err := strconv.Atoi(ls)
+			if err != nil {
+				log.Fatal("bad array size: %s", ls)
+			}
+			ret = typeArr{s.resolveExpr(t.Elt, nil), l}
 		}
-		ls := t.Len.(*ast.BasicLit).Value
-		l, err := strconv.Atoi(ls)
-		if err != nil {
-			log.Fatal("bad array size: %s", ls)
-		}
-		return typeArr{s.resolveExpr(t.Elt, nil), l}
 	case *ast.InterfaceType:
-		// should never be used
-		return nil
+		// the return should never be used
+		ret = nil
 	default:
 		log.Printf("resolveExpr, unknown: %T", e)
 		panic("why")
 	}
-	return nil
+	if opts != nil && opts.sect {
+		ret = typeSect{
+			sectOptional: opts.sectOptional,
+			sectStart:    opts.sectStart,
+			sectEnd:      opts.sectEnd,
+			el:           ret,
+		}
+	}
+	return ret
 }
 
 func (s *gen) resolveStruct(t string) typeInfo {
