@@ -1,6 +1,6 @@
 package bob
 
-//go:generate go run ./gen/main.go . partX3
+//go:generate go run ./gen/main.go . partX3 Mat6Pair mat6big point weight part
 
 import (
 	"bytes"
@@ -580,11 +580,13 @@ func (p *point) Decode(r *bobReader) error {
 	return nil
 }
 
+type wgt struct {
+	Idx   int16
+	Coeff int32
+}
+
 type weight struct {
-	Weights []struct {
-		Idx   int16
-		Coeff int32
-	}
+	Weights []wgt
 }
 
 type uv struct {
