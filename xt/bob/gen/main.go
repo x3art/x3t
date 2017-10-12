@@ -39,6 +39,7 @@ type gen struct {
 	structs   map[string]*ast.StructType
 	targets   map[string]typeInfo // contains types that need a decoder func generated.
 	generated map[string]bool     // marks generated types so that we don't generate a func twice.
+	hasDecode map[string]bool     // names of struct types with decoders (should be all types)
 
 	indent int
 	out    io.Writer
@@ -136,6 +137,27 @@ func (t typeF32) Fname() string {
 	return "f32"
 }
 
+type typeStr struct {
+	nofunc
+}
+
+func (t typeStr) Size() int {
+	return 0
+}
+
+func (t typeStr) Decode(out *gen, dest, buf string, nilErr bool) {
+	out.o("%s, err = r.decodeString()\n", dest)
+	out.errRet(nilErr)
+}
+
+func (t typeStr) Name() string {
+	return "string"
+}
+
+func (t typeStr) Fname() string {
+	return "str"
+}
+
 type typeSlice struct {
 	el    typeInfo
 	len32 bool
@@ -228,11 +250,15 @@ type structField struct {
 }
 
 type typeStruct struct {
-	name   string
-	fields []structField
+	name      string
+	hasDecode bool
+	fields    []structField
 }
 
 func (t typeStruct) Size() int {
+	if t.hasDecode {
+		return 0
+	}
 	sz := 0
 	for i := range t.fields {
 		s := t.fields[i].t.Size()
@@ -245,6 +271,11 @@ func (t typeStruct) Size() int {
 }
 
 func (t typeStruct) Decode(out *gen, dest, buf string, nilErr bool) {
+	if t.hasDecode {
+		out.o("err = %s.Decode(r)\n", dest)
+		out.errRet(nilErr)
+		return
+	}
 	out.targets[t.Name()] = t
 	bufdecoder := t.Size() != 0
 	if bufdecoder {
@@ -264,9 +295,14 @@ func (t typeStruct) Fname() string {
 }
 
 func (t typeStruct) Func(out *gen) {
+	if t.hasDecode {
+		return
+	}
 	bufdecoder := t.Size() != 0
 	if bufdecoder {
 		out.o("\nfunc (x *%s) decodeBuf(b []byte) {\n", t.name).i(1)
+		out.o("var err error\n")
+		out.o("_ = err\n")
 		off := 0
 		for i := range t.fields {
 			t.fields[i].t.Decode(out, "x."+t.fields[i].name, fmt.Sprintf("b[%d:]", off), false)
@@ -291,8 +327,8 @@ func (t typeStruct) Func(out *gen) {
 
 		if needbuf {
 			out.o("var buf []byte\n")
-			out.o("var err error\n")
 		}
+		out.o("var err error\n")
 
 		nextbuf := true // next non-zero field needs new buf.
 		bufoff := 0
@@ -340,6 +376,9 @@ func exprOpts(tag string) (ret *eo) {
 			ret.sectOptional = true
 		}
 	}
+	if ret.sect {
+		panic("no sects")
+	}
 	return
 }
 
@@ -354,7 +393,7 @@ func (s *gen) resolveExpr(e ast.Expr, opts *eo) typeInfo {
 		case "float32":
 			return typeF32{}
 		case "string":
-			panic("not yet")
+			return typeStr{}
 		default:
 			return s.resolveStruct(t.Name)
 		}
@@ -369,8 +408,12 @@ func (s *gen) resolveExpr(e ast.Expr, opts *eo) typeInfo {
 			log.Fatal("bad array size: %s", ls)
 		}
 		return typeArr{s.resolveExpr(t.Elt, nil), l}
+	case *ast.InterfaceType:
+		// should never be used
+		return nil
 	default:
-		log.Fatal("resolveExpr, unknown: %v", e)
+		log.Printf("resolveExpr, unknown: %T", e)
+		panic("why")
 	}
 	return nil
 }
@@ -404,6 +447,7 @@ func (s *gen) resolveStruct(t string) typeInfo {
 		})
 
 	}
+	ret.hasDecode = s.hasDecode[t]
 	s.targets[t] = ret
 	return ret
 }
@@ -414,41 +458,23 @@ func (s *gen) parseFile(fs *token.FileSet, fname string) {
 		log.Fatalf("parser.ParseFile(%s): %v", fname, err)
 	}
 	ast.Inspect(f, func(n ast.Node) bool {
-		typ, ok := n.(*ast.TypeSpec)
-		if !ok {
-			return true
-		}
-		st, ok := typ.Type.(*ast.StructType)
-		if !ok {
-			return true
-		}
-		s.structs[typ.Name.Name] = st
-		/*
-			for _, f := range st.Fields.List {
-				if f.Tag == nil {
-					continue
-				}
-				ts, err := strconv.Unquote(f.Tag.Value)
-				if err != nil {
-					log.Fatalf("unquote: %v", err)
-				}
-				tag := reflect.StructTag(ts)
-				tv, ok := tag.Lookup("bobgen")
-				if !ok {
-					continue
-				}
-				_ = tv
-				fType, ok := f.Type.(*ast.Ident)
-				if !ok {
-					// XXX - definitely need to handle slices and arrays here.
-					continue
-				}
-				if len(f.Names) != 1 {
-					log.Fatalf("%s embed field name problem: %v", typ.Name.Name, f.Names)
-				}
-				s.targets[fType.Name] = nil
+		switch typ := n.(type) {
+		case *ast.TypeSpec:
+			st, ok := typ.Type.(*ast.StructType)
+			if !ok {
+				return true
 			}
-		*/
+			s.structs[typ.Name.Name] = st
+		case *ast.FuncDecl:
+			if typ.Recv != nil && typ.Name.Name == "Decode" {
+				switch st := typ.Recv.List[0].Type.(type) {
+				case *ast.StarExpr:
+					s.hasDecode[st.X.(*ast.Ident).Name] = true
+				default:
+					log.Fatal("unknown receiver type: %T", st)
+				}
+			}
+		}
 		return true
 	})
 }
@@ -485,6 +511,7 @@ func main() {
 		structs:   make(map[string]*ast.StructType),
 		targets:   make(map[string]typeInfo),
 		generated: make(map[string]bool),
+		hasDecode: make(map[string]bool),
 		indent:    0,
 		out:       out,
 	}
