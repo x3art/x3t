@@ -1,5 +1,7 @@
 package bob
 
+//go:generate go run ./gen/main.go . partX3
+
 import (
 	"bytes"
 	"fmt"
@@ -186,7 +188,7 @@ func tdec(t reflect.Type, flags uint) decd {
 				}
 				var sect, sectOptional bool
 				var sectStart, sectEnd sTag
-				for _, t := range strings.Split(field.Tag.Get("x3t"), ",") {
+				for _, t := range strings.Split(field.Tag.Get("bobgen"), ",") {
 					if t == "len32" {
 						nflags |= len32
 					} else if strings.HasPrefix(t, "sect") {
@@ -452,9 +454,9 @@ func decDecoder(r *bobReader, v interface{}) error {
 }
 
 type Bob struct {
-	Info   string      `x3t:"sect:INFO:/INF,optional"`
-	Mat6   []material6 `x3t:"sect:MAT6:/MAT,len32"`
-	Bodies []body      `x3t:"sect:BODY:/BOD"`
+	Info   string      `bobgen:"sect:INFO:/INF,optional"`
+	Mat6   []material6 `bobgen:"sect:MAT6:/MAT,len32"`
+	Bodies []body      `bobgen:"sect:BODY:/BOD"`
 }
 
 type mat6Value struct {
@@ -592,13 +594,13 @@ type uv struct {
 
 type faceList struct {
 	MaterialIndex int32
-	Faces         [][4]int32 `x3t:"len32"`
+	Faces         [][4]int32 `bobgen:"len32"`
 }
 
 type faceListX3 struct {
 	MaterialIndex int32
-	Faces         [][4]int32 `x3t:"len32"`
-	UVList        []uv       `x3t:"len32"`
+	Faces         [][4]int32 `bobgen:"len32"`
+	UVList        []uv       `bobgen:"len32"`
 }
 
 type partX3 struct {
@@ -639,8 +641,8 @@ func (p *part) Decode(r *bobReader) error {
 type body struct {
 	Size    int32
 	Flags   int32
-	Bones   []string `x3t:"sect:BONE:/BON,len32,optional"`
-	Points  []point  `x3t:"sect:POIN:/POI,len32,optional"`
-	Weights []weight `x3t:"sect:WEIG:/WEI,len32,optional"`
-	Parts   []part   `x3t:"sect:PART:/PAR,len32,optional"`
+	Bones   []string `bobgen:"sect:BONE:/BON,len32,optional"`
+	Points  []point  `bobgen:"sect:POIN:/POI,len32,optional"`
+	Weights []weight `bobgen:"sect:WEIG:/WEI,len32,optional"`
+	Parts   []part   `bobgen:"sect:PART:/PAR,len32,optional"`
 }
