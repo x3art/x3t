@@ -98,6 +98,8 @@ func (xf *Xfiles) add(fn string, xd Xdata) {
 		xd = pck{xd}
 	case ".pbd":
 		xd = pck{xd}
+	case ".pbb":
+		xd = pck{xd}
 	case ".bob":
 		xd = bobOpener{xd}
 	}
