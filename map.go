@@ -83,7 +83,7 @@ func (st *state) mapFuncs(fm template.FuncMap) {
 		return ret
 	}
 	fm["validGate"] = func(g xt.Gate) bool {
-		if g.S == 4 {
+		if g.S == "4" {
 			return false
 		}
 		switch g.Gid {
