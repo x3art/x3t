@@ -262,7 +262,7 @@ func (t typeSlice) Func(out *gen) {
 		out.o("l := int(l16)\n")
 	}
 
-	out.o("ret := make([]%s, l)\n", t.el.Name())
+	out.o("ret := make([]%s, l, l)\n", t.el.Name())
 
 	elsz := t.el.Size()
 	if elsz != 0 {

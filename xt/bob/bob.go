@@ -1,6 +1,6 @@
 package bob
 
-//go:generate go run ./gen/main.go . partX3 Mat6Pair mat6big all partNotX3 mat6small
+//go:generate go run ./gen/main.go . PartX3 Mat6Pair mat6big all PartNotX3 mat6small
 
 import (
 	"bytes"
@@ -25,10 +25,6 @@ import (
  * the original generic/reflect approach has been carefully benchmarked
  * and going from 900ms to decode a mid-sized model to 30ms felt like
  * a good trade-off for the increased complexity of this code.
- *
- * There is still one big performance win to do here. We can know when a
- * slice element has a static size and use that to fetch data for the
- * whole element.
  */
 
 // This keeps track of our reading. `buffer` is an internal buffer for
@@ -105,6 +101,7 @@ func (r *bobReader) data(l int, consume bool) ([]byte, error) {
 	if consume {
 		r.eat(l)
 	}
+	_ = ret[l-1]
 	return ret, nil
 }
 
@@ -233,7 +230,7 @@ func (r *bobReader) decodeString() (string, error) {
 type Bob struct {
 	Info   string      `bobgen:"sect:INFO:/INF,optional"`
 	Mat6   []material6 `bobgen:"sect:MAT6:/MAT,len32"`
-	Bodies []body      `bobgen:"sect:BODY:/BOD"`
+	Bodies []Body      `bobgen:"sect:BODY:/BOD"`
 }
 
 type mat6Value struct {
@@ -352,20 +349,19 @@ func (p *point) Decode(r *bobReader) error {
 	if err != nil {
 		return err
 	}
-	_ = d[sz*4-1]
 	for i := 0; i < sz; i++ {
-		p.values[i] = dec32(d[i*4:])
+		p.values[i] = dec32(d[i*4 : i*4+4])
 	}
 	return nil
 }
 
-type wgt struct {
+type Wgt struct {
 	Idx   int16
 	Coeff int32
 }
 
-type weight struct {
-	Weights []wgt
+type Weight struct {
+	Weights []Wgt
 }
 
 type uv struct {
@@ -384,43 +380,43 @@ type faceListX3 struct {
 	UVList        []uv       `bobgen:"len32"`
 }
 
-type partX3 struct {
+type PartX3 struct {
 	FacesX3 []faceListX3
 	X3Vals  [10]int32
 }
 
-type partNotX3 struct {
+type PartNotX3 struct {
 	Faces []faceList
 }
 
-type part struct {
+type Part struct {
 	Flags int32
-	p     interface{}
+	P     interface{}
 }
 
-func (p *part) Decode(r *bobReader) error {
+func (p *Part) Decode(r *bobReader) error {
 	f, err := r.decode32()
 	if err != nil {
 		return err
 	}
 	p.Flags = f
 	if (f & 0x10000000) != 0 {
-		px := partX3{}
+		px := PartX3{}
 		err = px.Decode(r)
-		p.p = px
+		p.P = px
 	} else {
-		px := partNotX3{}
+		px := PartNotX3{}
 		err = px.Decode(r)
-		p.p = px
+		p.P = px
 	}
 	return err
 }
 
-type body struct {
+type Body struct {
 	Size    int32
 	Flags   int32
 	Bones   []string `bobgen:"sect:BONE:/BON,len32,optional"`
 	Points  []point  `bobgen:"sect:POIN:/POI,len32,optional"`
-	Weights []weight `bobgen:"sect:WEIG:/WEI,len32,optional"`
-	Parts   []part   `bobgen:"sect:PART:/PAR,len32,optional"`
+	Weights []Weight `bobgen:"sect:WEIG:/WEI,len32,optional"`
+	Parts   []Part   `bobgen:"sect:PART:/PAR,len32,optional"`
 }
