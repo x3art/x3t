@@ -69,20 +69,33 @@ func main() {
 			usage()
 		}
 
-		for i := 0; i < 20; i++ {
-			t := time.Now()
-			f := x.Open(args[2])
-			if f == nil {
-				fmt.Fprintf(os.Stderr, "No such file: %s\n", args[2])
-				os.Exit(1)
-			}
-			_, err := bob.Read(f)
-			if err != nil {
-				log.Fatal(err)
-			}
-			f.Close()
-			fmt.Printf("T: %v\n", time.Since(t))
+		f := x.Open(args[2])
+		if f == nil {
+			fmt.Fprintf(os.Stderr, "No such file: %s\n", args[2])
+			os.Exit(1)
 		}
+		b, err := bob.Read(f)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("info: %s\n", b.Info)
+		fmt.Printf("bodies: %d\n", len(b.Bodies))
+		for i := range b.Bodies {
+			bod := &b.Bodies[i]
+			fmt.Printf("sz %d, fl %d\n", bod.Size, bod.Flags)
+			fmt.Printf("bones: %v\n", bod.Bones)
+			fmt.Printf("weights: %v\n", bod.Weights)
+			fmt.Printf("parts: %v\n", len(bod.Parts))
+			for j := range bod.Parts {
+				fmt.Printf("pfl: 0x%x\n", bod.Parts[j].Flags)
+				p := bod.Parts[j].P.(bob.PartX3)
+				fmt.Printf("pfacelist: %d\n", len(p.FacesX3))
+			}
+			fmt.Printf("points: %v\n", len(bod.Points))
+		}
+
+		f.Close()
 	case "bobBench":
 		t := time.Now()
 		x.Map(func(d, f string) {
