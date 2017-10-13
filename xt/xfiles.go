@@ -202,7 +202,7 @@ type stupidDescramblerOff struct {
 
 func (d *stupidDescramblerOff) Read(p []byte) (int, error) {
 	n, err := d.r.Read(p)
-	if err == nil && d.addOff {
+	if err == nil {
 		if d.addOff {
 			for i := 0; i < n; i++ {
 				p[i] ^= d.cookie + byte(d.off+i)
