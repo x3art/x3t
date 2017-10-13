@@ -9,8 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"unsafe"
 )
 
 // Access files according to the rules as I understand them.
@@ -146,14 +148,46 @@ func (xf *Xfiles) parseCD(basename string) bool {
 
 type stupidDescrambler struct {
 	io.ReadCloser
-	cookie byte
+	c64 uint64
+}
+
+func newSD(r io.ReadCloser, c byte) io.ReadCloser {
+	c64 := uint64(c)
+	c64 |= c64 << 8
+	c64 |= c64 << 16
+	c64 |= c64 << 32
+	return &stupidDescrambler{r, c64}
+}
+
+const wordSize = 8
+const supportsUnaligned = runtime.GOARCH == "amd64"
+
+func fastXOR(b []byte, c64 uint64) {
+	n := len(b)
+
+	w := n / wordSize
+
+	bw := *(*[]uint64)(unsafe.Pointer(&b))
+	for i := 0; i < w; i++ {
+		bw[i] ^= c64
+	}
+	for i := (n - n%wordSize); i < n; i++ {
+		b[i] ^= byte(c64 & 0xff)
+	}
+}
+
+func safeXOR(b []byte, c byte) {
+	for i := range b {
+		b[i] ^= c
+	}
 }
 
 func (s *stupidDescrambler) Read(p []byte) (int, error) {
 	n, err := s.ReadCloser.Read(p)
-	c := s.cookie
-	for i := range p {
-		p[i] ^= c
+	if supportsUnaligned {
+		fastXOR(p, s.c64)
+	} else {
+		safeXOR(p, byte(s.c64&0xff))
 	}
 	return n, err
 }
@@ -294,5 +328,5 @@ type bobOpener struct {
 }
 
 func (b bobOpener) Open() io.ReadCloser {
-	return &stupidDescrambler{b.xd.Open(), 51}
+	return newSD(b.xd.Open(), 51)
 }
