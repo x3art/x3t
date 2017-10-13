@@ -159,6 +159,11 @@ func (x *X) ShipDock(s *Ship) map[string]int {
 	return ret
 }
 
+func (x *X) ShipNonFighterDock(s *Ship) int {
+	sd := x.ShipDock(s)
+	return s.DockingSlots - sd["fighters"]
+}
+
 const (
 	DP_TS = 1 << iota
 	DP_M6

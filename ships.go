@@ -229,4 +229,6 @@ func (st *state) shipFuncs(fm template.FuncMap) {
 	}
 	fm["shieldStr"] = xt.ShipShieldStr
 	fm["ShipSpeedMax"] = xt.ShipSpeedMax
+	fm["ShipDock"] = st.x.ShipDock
+	fm["ShipNonFighterDock"] = st.x.ShipNonFighterDock
 }

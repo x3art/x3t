@@ -8,7 +8,9 @@
   Hull strength: {{.HullStrength}}<br />
   Weapon energy: {{.WeaponsEnergy}} MJ (+{{calcf .WeaponsEnergy .WeaponsRechargeRate "*"}}MW)
   <br />
-  Scene: {{.ShipScene}}
+  {{- range $k, $v := ShipDock .}}
+   Dock {{ $k }}: {{ $v }}<br />
+  {{- end}}
   <br />
   Lasers:<br />
 <form>
