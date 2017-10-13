@@ -17,13 +17,14 @@ var typeMap = map[string]struct {
 	fn string
 	t  reflect.Type
 }{
-	"Suns":     {"addon/types/TSuns.txt", reflect.TypeOf(TSun{})},
-	"Shields":  {"addon/types/TShields.txt", reflect.TypeOf(TShield{})},
-	"Ships":    {"addon/types/TShips.txt", reflect.TypeOf(Ship{})},
-	"Cockpits": {"addon/types/TCockpits.txt", reflect.TypeOf(Cockpit{})},
-	"Lasers":   {"addon/types/TLaser.txt", reflect.TypeOf(TLaser{})},
-	"Docks":    {"addon/types/TDocks.txt", reflect.TypeOf(TDock{})},
-	"Bullets":  {"addon/types/TBullets.txt", reflect.TypeOf(TBullet{})},
+	"Suns":          {"addon/types/TSuns.txt", reflect.TypeOf(TSun{})},
+	"Shields":       {"addon/types/TShields.txt", reflect.TypeOf(TShield{})},
+	"Ships":         {"addon/types/TShips.txt", reflect.TypeOf(Ship{})},
+	"Cockpits":      {"addon/types/TCockpits.txt", reflect.TypeOf(Cockpit{})},
+	"Lasers":        {"addon/types/TLaser.txt", reflect.TypeOf(TLaser{})},
+	"Docks":         {"addon/types/TDocks.txt", reflect.TypeOf(TDock{})},
+	"Bullets":       {"addon/types/TBullets.txt", reflect.TypeOf(TBullet{})},
+	"DummyAnimated": {"addon/types/Dummies.txt", reflect.TypeOf(DummyAnimated{})},
 }
 
 func (x *X) typeLookup(typ string, value string, index bool) (reflect.Value, error) {
@@ -381,4 +382,16 @@ type TBullet struct {
 	VideoID                string
 	Skin                   string
 	ObjectID               string
+}
+
+type DummyAnimated struct {
+	Id       string
+	Flags    string
+	Unknown1 int
+	Unknown2 string
+	Unknown3 int
+}
+
+func (x *X) GetDum() []DummyAnimated {
+	return x.getType("DummyAnimated").v.([]DummyAnimated)
 }
