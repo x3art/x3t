@@ -1,5 +1,11 @@
 package xt
 
+import (
+	"fmt"
+	"math/bits"
+	"strings"
+)
+
 // Apparently this is arcane, hardcoded knowledge that can not be
 // extracted from any configuration file.
 
@@ -127,4 +133,93 @@ func ShipShieldStr(s *Ship) int {
 		return 0
 	}
 	return s.ShieldType.Strength * s.MaxShieldCount / 1000
+}
+
+func (x *X) ShipDock(s *Ship) map[string]int {
+	ret := make(map[string]int)
+	left := s.DockingSlots
+	dp := x.DockPorts()
+	sc := x.Scene(fmt.Sprintf("objects/%s.pbd", strings.Replace(s.ShipScene, "\\", "/", -1)))
+	for i := range sc.P {
+		dps := dp[strings.ToLower(sc.P[i].B)]
+		if dps == 0 {
+			continue
+		}
+		key := []string{}
+		for dps != 0 {
+			bit := uint(bits.TrailingZeros(uint(dps)))
+			key = append(key, dpname[1<<bit])
+			dps ^= 1 << bit
+		}
+		k := strings.Join(key, "/")
+		ret[k] = ret[k] + 1
+		left--
+	}
+	ret["fighters"] = left
+	return ret
+}
+
+const (
+	DP_TS = 1 << iota
+	DP_M6
+	DP_M8
+	DP_M1
+	DP_M2
+	DP_TL
+)
+
+var dpname = map[int]string{
+	DP_TS: "TS",
+	DP_M6: "M6",
+	DP_M8: "M8",
+	DP_M1: "M1",
+	DP_TL: "TL",
+	DP_M2: "M2",
+}
+
+var dpmap = map[string]int{
+	"ANIMATEDF_DOCKPORT_TRANSPORT": DP_TS,
+	"ANIMATEDF_DOCKPORT_M6":        DP_M6,
+	"ANIMATEDF_DOCKPORT_M8":        DP_M8,
+	"ANIMATEDF_DOCKPORT_STANDARD":  DP_TS | DP_M6,
+	"ANIMATEDF_DOCKPORT_HUGESHIP":  DP_M1 | DP_M2 | DP_TL,
+	"ANIMATEDF_DOCKPORT_BIGSHIP":   DP_M1 | DP_M2 | DP_M6 | DP_TL,
+	"ANIMATEDF_DOCKPORT_STARTONLY": 0,
+	"ANIMATEDF_DOCKPORT_FIGHTER":   0,
+	"ANIMATEDF_DOCKPORT_HANGAR":    0,
+	"ANIMATEDF_DOCKPORT_LANDONLY":  0,
+	"ANIMATEDF_DOCKPORT_M5":        0,
+	"NULL":                         0,
+	"ANIMATEDF_DOCKPORT_UDDOWN":      0,
+	"ANIMATEDF_DOCKPORT_UDBACK":      0,
+	"ANIMATEDF_DOCKPORT_BELOW30":     0,
+	"ANIMATEDF_DOCKPORT_BELOW60":     0,
+	"ANIMATEDF_DOCKPORT_UDFWD":       0,
+	"ANIMATEDF_DOCKPORT_QUICKLAUNCH": 0,
+	"ANIMATEDF_DOCKPORT_FWDPUSH":     0,
+	"ANIMATEDF_DOCKPORT_M4":          0,
+}
+
+func (x *X) DockPorts() map[string]int {
+	ret := make(map[string]int)
+	dums := x.GetDum()
+	miss := make(map[string]int)
+	for i := range dums {
+		d := &dums[i]
+		flags := 0
+		for _, f := range strings.Split(d.Flags, "|") {
+			fl, ok := dpmap[f]
+			if !ok {
+				miss[f] = 0
+			}
+			flags |= fl
+		}
+		if flags != 0 {
+			ret[strings.ToLower(d.Id)] = flags
+		}
+	}
+	for k := range miss {
+		fmt.Printf("\"%s\": 0,\n", k)
+	}
+	return ret
 }
