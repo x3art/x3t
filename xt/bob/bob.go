@@ -1,15 +1,12 @@
 package bob
 
-//go:generate go run ./gen/main.go . partX3 Mat6Pair mat6big point weight part
+//go:generate go run ./gen/main.go . partX3 Mat6Pair mat6big all partNotX3 mat6small
 
 import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"math"
-	"reflect"
-	"strings"
 )
 
 /*
@@ -44,21 +41,20 @@ type bobReader struct {
 	w      []byte
 }
 
-var bobDec = tdec(reflect.TypeOf(Bob{}), 0)
-
 type sTag [4]byte
 
-func Read(r io.Reader) (*Bob, error) {
-	br := &bobReader{source: r}
+type all struct {
+	b Bob `bobgen:"sect:BOB1:/BOB"`
+}
 
-	b := &Bob{}
-	err := br.sect(sTag{'B', 'O', 'B', '1'}, sTag{'/', 'B', 'O', 'B'}, false, func() error {
-		return bobDec(br, b)
-	})
+func Read(r io.Reader) (*Bob, error) {
+
+	a := all{}
+	err := a.Decode(&bobReader{source: r})
 	if err != nil {
 		return nil, err
 	}
-	return b, nil
+	return &a.b, nil
 }
 
 // Data reader. We return a slice of an internal data buffer at least
@@ -164,106 +160,6 @@ type decoder interface {
 	Decode(*bobReader) error
 }
 
-type decd func(*bobReader, interface{}) error
-
-var fsCache = map[reflect.Type]decd{}
-
-func tdec(t reflect.Type, flags uint) decd {
-	if c, ok := fsCache[t]; ok {
-		return c
-	}
-	var ret decd
-	if reflect.PtrTo(t).Implements(reflect.TypeOf((*decoder)(nil)).Elem()) {
-		ret = decDecoder
-	} else {
-		switch t.Kind() {
-		case reflect.Struct:
-			n := t.NumField()
-			fields := make([]decd, n)
-			for i := 0; i < n; i++ {
-				nflags := uint(0)
-				field := t.Field(i)
-				if field.PkgPath != "" {
-					continue
-				}
-				var sect, sectOptional bool
-				var sectStart, sectEnd sTag
-				for _, t := range strings.Split(field.Tag.Get("bobgen"), ",") {
-					if t == "len32" {
-						nflags |= len32
-					} else if strings.HasPrefix(t, "sect") {
-						x := strings.Split(t, ":")
-						if len(x) != 3 {
-							panic(fmt.Errorf("sect tag bad: [%s]", t))
-						}
-						sect = true
-						copy(sectStart[:], x[1])
-						copy(sectEnd[:], x[2])
-					} else if t == "optional" {
-						sectOptional = true
-					}
-				}
-				fdec := tdec(field.Type, nflags)
-				if sect {
-					fields[i] = func(r *bobReader, v interface{}) error {
-						return r.sect(sectStart, sectEnd, sectOptional, func() error {
-							return fdec(r, v)
-						})
-					}
-				} else {
-					fields[i] = fdec
-				}
-			}
-			ret = func(r *bobReader, v interface{}) error {
-				val := reflect.Indirect(reflect.ValueOf(v))
-				for i := range fields {
-					if fields[i] == nil {
-						continue
-					}
-					err := fields[i](r, val.Field(i).Addr().Interface())
-					if err != nil {
-						return err
-					}
-				}
-				return nil
-			}
-		case reflect.Slice:
-			slDec := tdec(t.Elem(), 0)
-			if (flags & len32) != 0 {
-				ret = slDec.decodeSlice32
-			} else {
-				ret = slDec.decodeSlice16
-			}
-		case reflect.Array:
-			ret = decodeArray
-		case reflect.Int16:
-			ret = func(r *bobReader, v interface{}) (err error) {
-				*(v.(*int16)), err = r.decode16()
-				return
-			}
-		case reflect.Int32:
-			ret = func(r *bobReader, v interface{}) (err error) {
-				*(v.(*int32)), err = r.decode32()
-				return
-			}
-		case reflect.String:
-			ret = func(r *bobReader, v interface{}) (err error) {
-				*(v.(*string)), err = r.decodeString()
-				return
-			}
-		case reflect.Float32:
-			ret = func(r *bobReader, v interface{}) (err error) {
-				*(v.(*float32)), err = r.decodef32()
-				return
-			}
-		default:
-			log.Fatalf("unknown type %s", t.Name())
-		}
-	}
-	fsCache[t] = ret
-	return ret
-}
-
 func dec16(d []byte) int16 {
 	_ = d[1]
 	return int16(uint16(d[1]) | uint16(d[0])<<8)
@@ -332,125 +228,6 @@ func (r *bobReader) decodeString() (string, error) {
 		}
 	}
 	return string(ret), nil
-}
-
-func (dec decd) decodeSlice32(r *bobReader, v interface{}) error {
-	l, err := r.decode32()
-	if err != nil {
-		return err
-	}
-	return dec.decodeSlice(r, v, int(l))
-}
-
-func (dec decd) decodeSlice16(r *bobReader, v interface{}) error {
-	l, err := r.decode16()
-	if err != nil {
-		return err
-	}
-	return dec.decodeSlice(r, v, int(l))
-}
-
-func (dec decd) decodeSlice(r *bobReader, v interface{}, l int) error {
-	switch v := v.(type) {
-	case *[]int16:
-		*v = make([]int16, l, l)
-		d, err := r.data(len(*v)*2, true)
-		if err != nil {
-			return err
-		}
-		for i := range *v {
-			(*v)[i] = dec16(d[i*2:])
-		}
-		return nil
-	case *[]int32:
-		*v = make([]int32, l, l)
-		d, err := r.data(len(*v)*4, true)
-		if err != nil {
-			return err
-		}
-		for i := range *v {
-			(*v)[i] = dec32(d[i*4:])
-		}
-		return nil
-	case *[]float32:
-		*v = make([]float32, l, l)
-		d, err := r.data(len(*v)*4, true)
-		if err != nil {
-			return err
-		}
-		for i := range *v {
-			(*v)[i] = decf32(d[i*4:])
-		}
-		return nil
-	default:
-		val := reflect.Indirect(reflect.ValueOf(v))
-		val.Set(reflect.MakeSlice(val.Type(), l, l))
-		for i := 0; i < l; i++ {
-			err := dec(r, val.Index(i).Addr().Interface())
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	return nil
-}
-
-func decodeArray(r *bobReader, v interface{}) error {
-	switch v := v.(type) {
-	case *[10]int32:
-		d, err := r.data(len(v)*4, true)
-		if err != nil {
-			return err
-		}
-		for i := range *v {
-			(*v)[i] = dec32(d[i*4:])
-		}
-		return nil
-	case *[4]int32:
-		d, err := r.data(len(v)*4, true)
-		if err != nil {
-			return err
-		}
-		for i := range *v {
-			(*v)[i] = dec32(d[i*4:])
-		}
-		return nil
-	case *[6]float32:
-		d, err := r.data(len(v)*4, true)
-		if err != nil {
-			return err
-		}
-		for i := range *v {
-			(*v)[i] = decf32(d[i*4:])
-		}
-		return nil
-	case *[3]int16:
-		d, err := r.data(len(v)*2, true)
-		if err != nil {
-			return err
-		}
-		for i := range *v {
-			(*v)[i] = dec16(d[i*2:])
-		}
-		return nil
-	case *[2]int16:
-		d, err := r.data(len(v)*2, true)
-		if err != nil {
-			return err
-		}
-		for i := range *v {
-			(*v)[i] = dec16(d[i*2:])
-		}
-		return nil
-	default:
-		log.Fatalf("Special case array type  %T", v)
-	}
-	return nil
-}
-
-func decDecoder(r *bobReader, v interface{}) error {
-	return v.(decoder).Decode(r)
 }
 
 type Bob struct {
@@ -529,9 +306,6 @@ type material6 struct {
 	mat   interface{}
 }
 
-var m6bigDec = tdec(reflect.TypeOf(mat6big{}), 0)
-var m6smallDec = tdec(reflect.TypeOf(mat6small{}), 0)
-
 func (m *material6) Decode(r *bobReader) error {
 	var err error
 	m.Index, _ = r.decode16()
@@ -540,11 +314,15 @@ func (m *material6) Decode(r *bobReader) error {
 		return err
 	}
 	if m.Flags == matFlagBig {
-		m.mat = &mat6big{}
-		return m6bigDec(r, m.mat)
+		mx := mat6big{}
+		err = mx.Decode(r)
+		m.mat = mx
+		return err
 	} else {
-		m.mat = &mat6small{}
-		return m6smallDec(r, m.mat)
+		mx := mat6small{}
+		err = mx.Decode(r)
+		m.mat = mx
+		return err
 	}
 }
 
@@ -619,9 +397,6 @@ type part struct {
 	p     interface{}
 }
 
-var px3Dec = tdec(reflect.TypeOf(partX3{}), 0)
-var pnx3Dec = tdec(reflect.TypeOf(partNotX3{}), 0)
-
 func (p *part) Decode(r *bobReader) error {
 	f, err := r.decode32()
 	if err != nil {
@@ -630,11 +405,11 @@ func (p *part) Decode(r *bobReader) error {
 	p.Flags = f
 	if (f & 0x10000000) != 0 {
 		px := partX3{}
-		err = px3Dec(r, &px)
+		err = px.Decode(r)
 		p.p = px
 	} else {
 		px := partNotX3{}
-		err = pnx3Dec(r, &px)
+		err = px.Decode(r)
 		p.p = px
 	}
 	return err
