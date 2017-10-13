@@ -352,6 +352,7 @@ func (p *point) Decode(r *bobReader) error {
 	if err != nil {
 		return err
 	}
+	_ = d[sz*4-1]
 	for i := 0; i < sz; i++ {
 		p.values[i] = dec32(d[i*4:])
 	}
