@@ -29,8 +29,12 @@ func NewX(dir string) *X {
 	return x
 }
 
-func (x *X) Open(f string) io.Reader {
+func (x *X) Open(f string) io.ReadCloser {
 	return x.xf.Open(f)
+}
+
+func (x *X) Map(f func(string, string)) {
+	x.xf.Map(f)
 }
 
 // Asynchronously pre-cache everything we might want to load later.
