@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -41,7 +42,7 @@ func main() {
 	}
 
 	args := flag.Args()
-	x := xt.XFiles(args[0])
+	x := xt.NewX(args[0])
 
 	switch args[1] {
 	case "ls":
@@ -64,6 +65,8 @@ func main() {
 			usage()
 		}
 		grep(x, args[2])
+	case "ship":
+		ship(x, args[2:]...)
 	case "bob":
 		if flag.NArg() != 3 {
 			usage()
@@ -132,7 +135,7 @@ func main() {
 	}
 }
 
-func grepone(x xt.Xfiles, fn string, needle string) {
+func grepone(x *xt.X, fn string, needle string) {
 	f := x.Open(fn)
 	if f == nil {
 		log.Fatalf("Eh? %s", fn)
@@ -148,8 +151,40 @@ func grepone(x xt.Xfiles, fn string, needle string) {
 	}
 }
 
-func grep(x xt.Xfiles, needle string) {
+func grep(x *xt.X, needle string) {
 	x.Map(func(dn, fn string) {
 		grepone(x, dn+"/"+fn, needle)
 	})
+}
+
+func ship(x *xt.X, a ...string) {
+	var name, variation string
+
+	switch len(a) {
+	case 1:
+		name = a[0]
+	case 2:
+		name = a[0]
+		variation = a[1]
+	default:
+		log.Fatalf("too many args")
+	}
+
+	ships := x.GetShips()
+	for i := range ships {
+		if ships[i].Description == name && ships[i].Variation == variation {
+			/*			scene := ships[i].ShipScene
+
+						"ships\\split\\split_tl_elephant_scene",
+						objects/ships/split/split_tl_elephant_scene.pbd
+			*/
+
+			e := json.NewEncoder(os.Stdout)
+			e.SetIndent("\t", "")
+			err := e.Encode(&ships[i])
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
 }
