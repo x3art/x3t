@@ -349,11 +349,13 @@ func (t typeStruct) Decode(out *gen, dest string, buf *decBuf, nilErr bool) {
 		out.errRet(nilErr)
 		return
 	}
-	out.targets[t.Name()] = t
 	bufdecoder := t.Size() != 0
 	if bufdecoder {
-		out.o("%s.decodeBuf(%s)\n", dest, buf)
+		for i := range t.fields {
+			t.fields[i].t.Decode(out, fmt.Sprintf("%s.%s", dest, t.fields[i].name), buf, false)
+		}
 	} else {
+		out.targets[t.Name()] = t
 		out.o("err = %s.Decode(r)\n", dest)
 		out.errRet(nilErr)
 	}
@@ -368,59 +370,49 @@ func (t typeStruct) Fname() string {
 }
 
 func (t typeStruct) Func(out *gen) {
-	if t.hasDecode {
+	bufdecoder := t.Size() != 0
+	if t.hasDecode || bufdecoder {
 		return
 	}
-	bufdecoder := t.Size() != 0
-	if bufdecoder {
-		out.o("\nfunc (x *%s) decodeBuf(b []byte) {\n", t.name).i(1)
-		db := &decBuf{"b", "", 0}
-		out.o("var err error\n")
-		out.o("_ = err\n")
-		for i := range t.fields {
-			t.fields[i].t.Decode(out, "x."+t.fields[i].name, db, false)
+	out.o("\nfunc (x *%s) Decode(r *bobReader) error {\n", t.name).i(1)
+	sizeGroups := []int{}
+	sz := 0
+	needbuf := false
+	for i := range t.fields {
+		s := t.fields[i].t.Size()
+		if s == 0 {
+			sizeGroups = append(sizeGroups, sz)
+			sz = 0
+		} else {
+			needbuf = true
+			sz += s
 		}
-	} else {
-		out.o("\nfunc (x *%s) Decode(r *bobReader) error {\n", t.name).i(1)
-		sizeGroups := []int{}
-		sz := 0
-		needbuf := false
-		for i := range t.fields {
-			s := t.fields[i].t.Size()
-			if s == 0 {
-				sizeGroups = append(sizeGroups, sz)
-				sz = 0
-			} else {
-				needbuf = true
-				sz += s
-			}
-		}
-		sizeGroups = append(sizeGroups, sz)
-
-		if needbuf {
-			out.o("var buf []byte\n")
-		}
-		db := &decBuf{"buf", "", 0}
-		out.o("var err error\n")
-
-		nextbuf := true // next non-zero field needs new buf.
-		for i := range t.fields {
-			s := t.fields[i].t.Size()
-			if s == 0 {
-				sizeGroups = sizeGroups[1:]
-				nextbuf = true
-			} else if nextbuf {
-				out.o("buf, err = r.data(%d, true)\n", sizeGroups[0])
-				out.errRet(false)
-				out.o("_ = buf[%d-1]\n", sizeGroups[0])
-				db.currentOff = 0
-				sizeGroups = sizeGroups[1:]
-				nextbuf = false
-			}
-			t.fields[i].t.Decode(out, "x."+t.fields[i].name, db, false)
-		}
-		out.o("return nil\n")
 	}
+	sizeGroups = append(sizeGroups, sz)
+
+	if needbuf {
+		out.o("var buf []byte\n")
+	}
+	db := &decBuf{"buf", "", 0}
+	out.o("var err error\n")
+
+	nextbuf := true // next non-zero field needs new buf.
+	for i := range t.fields {
+		s := t.fields[i].t.Size()
+		if s == 0 {
+			sizeGroups = sizeGroups[1:]
+			nextbuf = true
+		} else if nextbuf {
+			out.o("buf, err = r.data(%d, true)\n", sizeGroups[0])
+			out.errRet(false)
+			out.o("_ = buf[%d-1]\n", sizeGroups[0])
+			db.currentOff = 0
+			sizeGroups = sizeGroups[1:]
+			nextbuf = false
+		}
+		t.fields[i].t.Decode(out, "x."+t.fields[i].name, db, false)
+	}
+	out.o("return nil\n")
 	out.i(-1).o("}\n")
 }
 
