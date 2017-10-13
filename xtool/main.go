@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -173,18 +172,7 @@ func ship(x *xt.X, a ...string) {
 	ships := x.GetShips()
 	for i := range ships {
 		if ships[i].Description == name && ships[i].Variation == variation {
-			/*			scene := ships[i].ShipScene
-
-						"ships\\split\\split_tl_elephant_scene",
-						objects/ships/split/split_tl_elephant_scene.pbd
-			*/
-
-			e := json.NewEncoder(os.Stdout)
-			e.SetIndent("\t", "")
-			err := e.Encode(&ships[i])
-			if err != nil {
-				log.Fatal(err)
-			}
+			fmt.Println(x.ShipDock(&ships[i]))
 		}
 	}
 }
