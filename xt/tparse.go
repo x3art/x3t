@@ -32,7 +32,7 @@ func (x *X) tparsev(f io.Reader, slicev reflect.Value) {
 		log.Fatal(err)
 	}
 	inf := struct {
-		Ver  int
+		Ver  string
 		Nrec int
 	}{}
 	t := tParser{rec: rec, t: x.GetText(), x: x}
@@ -170,6 +170,11 @@ func (t *tParser) pstruct(v reflect.Value) error {
 		fv := v.Field(i)
 		sf := v.Type().Field(i)
 		t.lastTag = sf.Tag.Get("x3t")
+		if len(t.rec) == 0 {
+			// It appears that it's legal to just forget about
+			// the last few values if we don't care about them.
+			return nil
+		}
 		err := t.pvalue(fv)
 		if err != nil {
 			return fmt.Errorf("Parse Field (%s): %v", v.Type().Field(i).Name, err)
