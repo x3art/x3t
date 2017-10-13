@@ -19,6 +19,9 @@ type Scene struct {
 
 func (x *X) Scene(f string) *Scene {
 	r := x.Open(f)
+	if r == nil {
+		return &Scene{}
+	}
 	defer r.Close()
 
 	sc := &Scene{}
@@ -33,6 +36,9 @@ func (x *X) Scene(f string) *Scene {
 		spl := strings.Split(ln, ";")
 		for i := range spl {
 			f := strings.TrimSpace(spl[i])
+			if f == "" {
+				continue
+			}
 			ch := f[0]
 			x := strings.TrimSpace(f[1:])
 			switch ch {
