@@ -23,7 +23,7 @@ type typeInfo interface {
 	// Decode generates the code needed to decode from buf into
 	// dest. buf may only be used on types with non-zero Size.
 	// nilErr specifies if the function we're in returns nil, err
-	Decode(out *gen, dest, buf string, nilErr bool)
+	Decode(out *gen, dest string, buf *decBuf, nilErr bool)
 	// name of this type.
 	Name() string
 
@@ -69,12 +69,42 @@ func (out *gen) errRet(addnil bool) *gen {
 	return out
 }
 
+type decBuf struct {
+	varName    string
+	addStr     string
+	currentOff int
+}
+
+func (d *decBuf) consumePrint(n int) string {
+	ret := ""
+	if d.addStr != "" {
+		ret = fmt.Sprintf("%s[(%s)+%d:]", d.varName, d.addStr, d.currentOff)
+	} else {
+		ret = fmt.Sprintf("%s[%d:]", d.varName, d.currentOff)
+	}
+	d.consume(n)
+	return ret
+}
+
+func (d *decBuf) String() string {
+	return d.consumePrint(0)
+}
+
+func (d *decBuf) consume(n int) {
+	d.currentOff += n
+}
+
+func (d *decBuf) add(a string) {
+	if d.addStr == "" {
+		d.addStr = a
+	} else {
+		d.addStr = fmt.Sprintf("(%s)+%s", d.addStr, a)
+	}
+}
+
 type nofunc struct{}
 
 func (_ nofunc) Func(out *gen) {
-}
-
-type decBuf struct {
 }
 
 type typeI32 struct {
@@ -85,8 +115,8 @@ func (t typeI32) Size() int {
 	return 4
 }
 
-func (t typeI32) Decode(out *gen, dest, buf string, nilErr bool) {
-	out.o("%s = dec32(%s)\n", dest, buf)
+func (t typeI32) Decode(out *gen, dest string, buf *decBuf, nilErr bool) {
+	out.o("%s = dec32(%s)\n", dest, buf.consumePrint(4))
 }
 
 func (t typeI32) Name() string {
@@ -105,8 +135,8 @@ func (t typeI16) Size() int {
 	return 2
 }
 
-func (t typeI16) Decode(out *gen, dest, buf string, nilErr bool) {
-	out.o("%s = dec16(%s)\n", dest, buf)
+func (t typeI16) Decode(out *gen, dest string, buf *decBuf, nilErr bool) {
+	out.o("%s = dec16(%s)\n", dest, buf.consumePrint(2))
 }
 
 func (t typeI16) Name() string {
@@ -125,8 +155,8 @@ func (t typeF32) Size() int {
 	return 4
 }
 
-func (t typeF32) Decode(out *gen, dest, buf string, nilErr bool) {
-	out.o("%s = decf32(%s)\n", dest, buf)
+func (t typeF32) Decode(out *gen, dest string, buf *decBuf, nilErr bool) {
+	out.o("%s = decf32(%s)\n", dest, buf.consumePrint(4))
 }
 
 func (t typeF32) Name() string {
@@ -145,7 +175,7 @@ func (t typeStr) Size() int {
 	return 0
 }
 
-func (t typeStr) Decode(out *gen, dest, buf string, nilErr bool) {
+func (t typeStr) Decode(out *gen, dest string, buf *decBuf, nilErr bool) {
 	out.o("%s, err = r.decodeString()\n", dest)
 	out.errRet(nilErr)
 }
@@ -166,13 +196,10 @@ type typeSect struct {
 }
 
 func (t typeSect) Size() int {
-	if t.sectOptional || t.el.Size() == 0 {
-		return 0
-	}
-	return t.el.Size() + 8
+	return 0
 }
 
-func (t typeSect) Decode(out *gen, dest, buf string, nilErr bool) {
+func (t typeSect) Decode(out *gen, dest string, buf *decBuf, nilErr bool) {
 	opt := "false"
 	if t.sectOptional {
 		opt = "true"
@@ -181,6 +208,9 @@ func (t typeSect) Decode(out *gen, dest, buf string, nilErr bool) {
 		t.sectStart[0], t.sectStart[1], t.sectStart[2], t.sectStart[3],
 		t.sectEnd[0], t.sectEnd[1], t.sectEnd[2], t.sectEnd[3],
 		opt).i(1)
+	if t.el.Size() != 0 {
+		log.Fatal("sized section without buf")
+	}
 	t.el.Decode(out, dest, buf, false)
 	out.o("return nil\n")
 	out.i(-1).o("})\n")
@@ -204,7 +234,7 @@ func (t typeSlice) Size() int {
 	return 0
 }
 
-func (t typeSlice) Decode(out *gen, dest, buf string, nilErr bool) {
+func (t typeSlice) Decode(out *gen, dest string, buf *decBuf, nilErr bool) {
 	out.targets[t.Name()] = t
 	out.o("%s, err = dec_%s(r)\n", dest, t.Fname())
 	out.errRet(nilErr)
@@ -238,11 +268,13 @@ func (t typeSlice) Func(out *gen) {
 	if elsz != 0 {
 		out.o("b, err := r.data(l*%d, true)\n", elsz)
 		out.errRet(true)
+		out.o("_ = b[l*%d-1]\n", elsz)
 		// zero sized elements will not use buf.
 	}
 	ivar := "i_" + t.Fname()
 	out.o("for %s := range ret {\n", ivar).i(1)
-	t.el.Decode(out, fmt.Sprintf("ret[%s]", ivar), fmt.Sprintf("b[%s*%d:]", ivar, elsz), true)
+	db := &decBuf{"b", fmt.Sprintf("%s*%d", ivar, elsz), 0}
+	t.el.Decode(out, fmt.Sprintf("ret[%s]", ivar), db, true)
 	out.i(-1).o("}\n")
 	out.o("return ret, nil\n")
 	out.i(-1).o("}\n")
@@ -257,14 +289,18 @@ func (t typeArr) Size() int {
 	return t.el.Size() * t.sz
 }
 
-func (t typeArr) Decode(out *gen, dest, buf string, nilErr bool) {
+func (t typeArr) Decode(out *gen, dest string, buf *decBuf, nilErr bool) {
 	ivar := "i_" + t.Fname()
 	out.o("for %s := range %s {\n", ivar, dest).i(1)
 	elsz := t.el.Size()
 	if elsz == 0 {
 		panic("no support for 0 size array elements yet")
 	}
-	t.el.Decode(out, fmt.Sprintf("%s[%s]", dest, ivar), fmt.Sprintf("%s[%s*%d:]", buf, ivar, elsz), nilErr)
+	db := *buf
+	buf.consume(t.Size())
+
+	db.add(fmt.Sprintf("%s*%d", ivar, elsz))
+	t.el.Decode(out, fmt.Sprintf("%s[%s]", dest, ivar), &db, nilErr)
 	out.i(-1).o("}\n")
 }
 
@@ -307,7 +343,7 @@ func (t typeStruct) Size() int {
 	return sz
 }
 
-func (t typeStruct) Decode(out *gen, dest, buf string, nilErr bool) {
+func (t typeStruct) Decode(out *gen, dest string, buf *decBuf, nilErr bool) {
 	if t.hasDecode {
 		out.o("err = %s.Decode(r)\n", dest)
 		out.errRet(nilErr)
@@ -338,12 +374,11 @@ func (t typeStruct) Func(out *gen) {
 	bufdecoder := t.Size() != 0
 	if bufdecoder {
 		out.o("\nfunc (x *%s) decodeBuf(b []byte) {\n", t.name).i(1)
+		db := &decBuf{"b", "", 0}
 		out.o("var err error\n")
 		out.o("_ = err\n")
-		off := 0
 		for i := range t.fields {
-			t.fields[i].t.Decode(out, "x."+t.fields[i].name, fmt.Sprintf("b[%d:]", off), false)
-			off += t.fields[i].t.Size()
+			t.fields[i].t.Decode(out, "x."+t.fields[i].name, db, false)
 		}
 	} else {
 		out.o("\nfunc (x *%s) Decode(r *bobReader) error {\n", t.name).i(1)
@@ -365,10 +400,10 @@ func (t typeStruct) Func(out *gen) {
 		if needbuf {
 			out.o("var buf []byte\n")
 		}
+		db := &decBuf{"buf", "", 0}
 		out.o("var err error\n")
 
 		nextbuf := true // next non-zero field needs new buf.
-		bufoff := 0
 		for i := range t.fields {
 			s := t.fields[i].t.Size()
 			if s == 0 {
@@ -377,11 +412,12 @@ func (t typeStruct) Func(out *gen) {
 			} else if nextbuf {
 				out.o("buf, err = r.data(%d, true)\n", sizeGroups[0])
 				out.errRet(false)
+				out.o("_ = buf[%d-1]\n", sizeGroups[0])
+				db.currentOff = 0
 				sizeGroups = sizeGroups[1:]
 				nextbuf = false
 			}
-			t.fields[i].t.Decode(out, "x."+t.fields[i].name, fmt.Sprintf("buf[%d:]", bufoff), false)
-			bufoff += t.fields[i].t.Size()
+			t.fields[i].t.Decode(out, "x."+t.fields[i].name, db, false)
 		}
 		out.o("return nil\n")
 	}
