@@ -61,35 +61,11 @@ func (x *X) SectorFlavor(s *Sector) string {
 	return r
 }
 
+const raceNamePage = 1266
+
 func (x *X) RaceName(r int) string {
-	switch r {
-	case 1:
-		return "Argon"
-	case 2:
-		return "Boron"
-	case 3:
-		return "Split"
-	case 4:
-		return "Paranid"
-	case 5:
-		return "Teladi"
-	case 6:
-		return "Xenon"
-	case 7:
-		return "Kha'ak"
-	case 8:
-		return "Pirates"
-	case 9:
-		return "Goner"
-	case 17:
-		return "ATF"
-	case 18:
-		return "Terran"
-	case 19:
-		return "Yaki"
-	default:
-		return "Unknown"
-	}
+	n, _ := x.GetText().Get(raceNamePage, r)
+	return n
 }
 
 func (x *X) AsteroidType(i int) string {
