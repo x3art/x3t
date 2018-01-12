@@ -60,6 +60,17 @@ func main() {
 		}
 		defer f.Close()
 		io.Copy(os.Stdout, f)
+	case "catscript":
+		if flag.NArg() != 3 {
+			usage()
+		}
+		err, scr := x.DecodeScript(args[2])
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, l := range scr.SourceText.Lines {
+			fmt.Printf("%s:\t%s%s\n", l.LineNr, l.Indent, strings.Join(l.Str, ""))
+		}
 	case "grep":
 		if flag.NArg() != 3 {
 			usage()
