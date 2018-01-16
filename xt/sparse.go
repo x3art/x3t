@@ -1,6 +1,9 @@
 package xt
 
-import "encoding/xml"
+import (
+	"encoding/xml"
+	"io"
+)
 
 type Script struct {
 	SourceText struct {
@@ -12,10 +15,8 @@ type Script struct {
 	} `xml:"sourcetext"`
 }
 
-func (x *X) DecodeScript(name string) (error, *Script) {
-	f := x.xf.Open(name)
-	defer f.Close()
-	d := xml.NewDecoder(f)
+func DecodeScript(r io.Reader) (error, *Script) {
+	d := xml.NewDecoder(r)
 	s := Script{}
 	err := d.Decode(&s)
 	if err != nil {
