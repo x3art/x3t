@@ -8,6 +8,8 @@ import (
 	"log"
 	"os"
 	"runtime/pprof"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"x3t/xt"
@@ -59,6 +61,34 @@ func main() {
 		}
 		defer f.Close()
 		io.Copy(os.Stdout, f)
+	case "catscript":
+		if flag.NArg() != 3 {
+			usage()
+		}
+		err, scr := x.DecodeScript(args[2])
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, l := range scr.SourceText.Lines {
+			fmt.Printf("%s%s\n", l.Indent, strings.Join(l.Str, ""))
+		}
+	case "cattextpage":
+		if flag.NArg() != 3 {
+			usage()
+		}
+		page, err := strconv.Atoi(args[2])
+		if err != nil {
+			log.Fatal(err)
+		}
+		text := x.GetText()
+		ids := make([]int, 0)
+		for k := range text[page] {
+			ids = append(ids, k)
+		}
+		sort.Ints(ids)
+		for k := range ids {
+			fmt.Printf("%d:\t%s\n", k, text[page][k])
+		}
 	case "grep":
 		if flag.NArg() != 3 {
 			usage()

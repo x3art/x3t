@@ -236,11 +236,12 @@ type Bob struct {
 type mat6Value struct {
 	Name string
 	Type int16
-	b    int32
-	i    int32
-	f    float32
-	f4   [4]float32
-	s    string
+
+	b  int32
+	i  int32
+	f  float32
+	f4 [4]float32
+	s  string
 }
 
 func (m *mat6Value) Decode(r *bobReader) error {
