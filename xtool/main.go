@@ -65,7 +65,9 @@ func main() {
 		if flag.NArg() != 3 {
 			usage()
 		}
-		err, scr := x.DecodeScript(args[2])
+		f := x.Open(args[2])
+		defer f.Close()
+		err, scr := xt.DecodeScript(f)
 		if err != nil {
 			log.Fatal(err)
 		}
