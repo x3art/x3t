@@ -12,7 +12,7 @@ func main() {
 	flag.Parse()
 	f, err := os.Open(flag.Arg(0))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "open: %v\n", err)
+		fmt.Fprintf(os.Stderr, "open: %s %v\n", flag.Arg(0), err)
 		os.Exit(1)
 	}
 	defer f.Close()
@@ -21,7 +21,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "xml: %v\n", err)
 	}
 	for _, l := range scr.SourceText.Lines {
-		fmt.Printf("%s%s\n", l.Indent, strings.Join(l.Str, ""))
+		a := make([]string, 0)
+		for _, s := range l.Str {
+			a = append(a, strings.TrimSpace(s))
+		}
+		fmt.Printf("%s\n", strings.Join(l.Str, ""))
 	}
 
 }
