@@ -12,17 +12,12 @@ The way to set it up is:
  
  - In the root of the repository add (or edit) a `.gitattributes` file with the following line:
 
-
-    addon/scripts/*.xml	diff=xscript
-
+        addon/scripts/*.xml	diff=xscript
 
  - In every cloned copy of the repository (this would be a terrible security risk if it happened automatically) edit .git/config and add: (Edit the path to where the binary was installed)
-
-
-    [diff "xscript"]
-        textconv = $HOME/go/bin/xscriptcat.exe
-
-   
+ 
+        [diff "xscript"]
+            textconv = $HOME/go/bin/xscriptcat.exe
 
  - Now every diff of MSCI scripts will show what source code changed instead of the xml mess it is hidden behind.
 
