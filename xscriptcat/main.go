@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"x3t/xt"
+
+	"github.com/x3art/x3t/xt"
 )
 
 func main() {

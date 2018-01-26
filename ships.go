@@ -7,7 +7,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"x3t/xt"
+
+	"github.com/x3art/x3t/xt"
 )
 
 func (st *state) ship(w http.ResponseWriter, req *http.Request) {

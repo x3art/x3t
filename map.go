@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"x3t/xt"
+
+	"github.com/x3art/x3t/xt"
 )
 
 func (st *state) sector(w http.ResponseWriter, req *http.Request) {

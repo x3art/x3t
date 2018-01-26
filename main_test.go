@@ -2,7 +2,8 @@ package main
 
 import (
 	"testing"
-	"x3t/xt"
+
+	"github.com/x3art/x3t/xt"
 )
 
 func BenchmarkUniverse(b *testing.B) {

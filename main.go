@@ -11,7 +11,8 @@ import (
 	"log"
 	"net/http"
 	"time"
-	"x3t/xt"
+
+	"github.com/x3art/x3t/xt"
 
 	"image/png"
 

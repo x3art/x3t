@@ -12,8 +12,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"x3t/xt"
-	"x3t/xt/bob"
+
+	"github.com/x3art/x3t/xt"
+	"github.com/x3art/x3t/xt/bob"
 )
 
 func usage() {
